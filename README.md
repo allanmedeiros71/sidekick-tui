@@ -82,6 +82,17 @@ Inside tmux, bind it to a popup:
 bind-key k display-popup -E -w 80% -h 80% sidekick
 ```
 
+The window slides in from the side when it opens, like the original
+SideKick. tmux draws the popup area itself in one go, so the slide happens
+inside it; for a drawer look, dock a borderless popup to the right edge
+(`-B` needs tmux 3.3 or later):
+
+```tmux
+bind-key k display-popup -E -B -x R -y 0 -w 60% -h 100% sidekick
+```
+
+Use `sidekick -no-animation` or the `[animation]` setting below to turn it off.
+
 Outside tmux, bind a global shortcut in your desktop environment that opens a
 terminal running `sidekick` (e.g. `ghostty -e sidekick`).
 
@@ -102,6 +113,10 @@ dotfiles work everywhere:
 ```toml
 # ~/.config/sidekick/config.toml
 theme = "default"   # or "cga", a nod to the original
+
+[animation]
+slide = "right"     # side the window slides in from: "left", "right" or "none"
+duration_ms = 180
 
 [sync]
 backend = "none"    # "git", "folder" or "none" (sync is not implemented yet)
