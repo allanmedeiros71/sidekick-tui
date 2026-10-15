@@ -1,0 +1,4 @@
+/sidekick
+/dist/
+*.test
+*.out
