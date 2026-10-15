@@ -13,6 +13,12 @@ type Module interface {
 	Title() string
 }
 
+// Closer is implemented by modules that hold unsaved state. The app calls
+// Close when the module is left or sidekick quits.
+type Closer interface {
+	Close() error
+}
+
 // Planned lists the modules on the roadmap, in menu order. Entries that are
 // not implemented yet are shown in the menu as placeholders.
 var Planned = []struct{ ID, Title, Description string }{
