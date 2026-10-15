@@ -11,13 +11,15 @@ import (
 	"github.com/allanmedeiros71/sidekick-tui/internal/config"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/calc"
+	"github.com/allanmedeiros71/sidekick-tui/internal/module/inspect"
 	"github.com/allanmedeiros71/sidekick-tui/internal/theme"
 )
 
 // registry builds the implemented modules by ID. Menu entries without one
 // are shown as "coming soon".
 var registry = map[string]func(theme.Theme) module.Module{
-	"calc": func(t theme.Theme) module.Module { return calc.New(t) },
+	"calc":    func(t theme.Theme) module.Module { return calc.New(t) },
+	"inspect": func(t theme.Theme) module.Module { return inspect.New(t) },
 }
 
 // Implemented reports whether the module with the given ID can be opened.
@@ -51,7 +53,18 @@ func (m Model) Open(id string) Model {
 		}
 	}
 	if build, ok := registry[id]; ok {
-		m.active = build(m.theme)
+		m = m.open(build)
+	}
+	return m
+}
+
+// open builds a module and tells it the window size, which it would
+// otherwise only learn on the next resize.
+func (m Model) open(build func(theme.Theme) module.Module) Model {
+	m.active = build(m.theme)
+	if m.width > 0 && m.height > 0 {
+		next, _ := m.active.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.active = next.(module.Module)
 	}
 	return m
 }
@@ -119,7 +132,7 @@ func (m Model) updateMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.notice = p.Title + " is coming soon"
 			return m, nil
 		}
-		m.active = build(m.theme)
+		m = m.open(build)
 		return m, m.active.Init()
 	}
 	return m, nil

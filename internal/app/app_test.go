@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -57,8 +58,27 @@ func TestQTypesInsideModule(t *testing.T) {
 func TestUnimplementedModuleShowsNotice(t *testing.T) {
 	var m tea.Model = New(config.Default())
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.(Model).active != nil || m.(Model).notice == "" {
 		t.Fatal("expected a coming-soon notice")
+	}
+}
+
+func TestOpenedModuleLearnsWindowSize(t *testing.T) {
+	var m tea.Model = New(config.Default())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 70, Height: 15})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	active := m.(Model).active
+	if active == nil || active.ID() != "inspect" {
+		t.Fatal("enter on the second entry should open the inspector")
+	}
+	for _, r := range "hello" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	// The inspector's output is taller than 15 rows unless it knows the size.
+	if n := strings.Count(m.(Model).active.View(), "\n") + 1; n > 15-4 {
+		t.Fatalf("inspector view has %d rows in a 15-row window", n)
 	}
 }

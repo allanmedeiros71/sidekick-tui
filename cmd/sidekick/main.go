@@ -4,6 +4,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/allanmedeiros71/sidekick-tui/internal/app"
 	"github.com/allanmedeiros71/sidekick-tui/internal/config"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/calc"
+	"github.com/allanmedeiros71/sidekick-tui/internal/module/inspect"
 )
 
 // Set by GoReleaser via -ldflags.
@@ -30,7 +32,8 @@ func main() {
 		fmt.Fprint(flag.CommandLine.Output(), `usage: sidekick [flags] [module] [input...]
 
 With no module, sidekick opens the menu. With a module name (e.g. calc) it
-opens that module directly. "sidekick calc <input>" prints the result and exits.
+opens that module directly. "sidekick calc <input>" and "sidekick inspect
+<input>" print the result and exit; they also read the input from a pipe.
 
 flags:
 `)
@@ -59,8 +62,10 @@ flags:
 			fmt.Fprintf(os.Stderr, "sidekick: unknown module %q\n", id)
 			os.Exit(2)
 		}
-		if id == "calc" && len(args) > 1 {
-			os.Exit(printCalc(strings.Join(args[1:], " ")))
+		if run, ok := printers[id]; ok {
+			if input, ok := cliInput(args[1:]); ok {
+				os.Exit(run(input))
+			}
 		}
 		root = root.Open(id)
 	}
@@ -70,6 +75,56 @@ flags:
 		fmt.Fprintf(os.Stderr, "sidekick: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// printers run a module non-interactively on the given input.
+var printers = map[string]func(string) int{
+	"calc":    printCalc,
+	"inspect": printInspect,
+}
+
+// cliInput returns the input given on the command line or, when there is
+// none and stdin is not a terminal, read from stdin without its final line
+// break. ok is false when the module should open interactively.
+func cliInput(args []string) (string, bool) {
+	if len(args) > 0 {
+		return strings.Join(args, " "), true
+	}
+	if fi, err := os.Stdin.Stat(); err != nil || fi.Mode()&os.ModeCharDevice != 0 {
+		return "", false
+	}
+	b, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sidekick: %v\n", err)
+		os.Exit(1)
+	}
+	s := strings.TrimSuffix(string(b), "\n")
+	return strings.TrimSuffix(s, "\r"), true
+}
+
+// printInspect describes input non-interactively, one section at a time.
+func printInspect(input string) int {
+	r := inspect.Inspect(input, time.Now())
+	if len(r.Sections) == 0 {
+		fmt.Fprintln(os.Stderr, "sidekick: nothing to inspect")
+		return 1
+	}
+	width := 0
+	for _, l := range r.Lines() {
+		width = max(width, len(l.Label))
+	}
+	indent := strings.Repeat(" ", width+4)
+	for i, s := range r.Sections {
+		if i > 0 {
+			fmt.Println()
+		}
+		fmt.Println(s.Title)
+		for _, l := range s.Lines {
+			value := strings.ReplaceAll(l.Value, "\n", "\n"+indent)
+			fmt.Printf("  %-*s  %s\n", width, l.Label, value)
+		}
+	}
+	return 0
 }
 
 // printCalc evaluates input non-interactively, for scripts and quick checks.
