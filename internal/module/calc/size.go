@@ -43,13 +43,13 @@ func unitName(s string) string {
 }
 
 // humanSize formats n bytes with the largest fitting unit of the given base.
-func humanSize(n int64, base int64) string {
+func humanSize(n float64, base int64) string {
 	names := []string{"KB", "MB", "GB", "TB", "PB", "EB"}
 	if base == 1024 {
 		names = []string{"KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
 	}
 	neg := n < 0
-	f := float64(n)
+	f := n
 	if neg {
 		f = -f
 	}
@@ -85,13 +85,13 @@ func convertSize(exprText, unitText string) (Result, error) {
 	if !ok {
 		return Result{}, &unknownUnitError{unitText}
 	}
-	v := strconv.FormatFloat(float64(n.v)/float64(u), 'f', 4, 64)
+	v := strconv.FormatFloat(n.float()/float64(u), 'f', 4, 64)
 	v = strings.TrimSuffix(strings.TrimRight(v, "0"), ".")
 	return Result{Kind: "size", Lines: []Line{
 		{"result", v + " " + unitName(unitText)},
-		{"bytes", strconv.FormatInt(n.v, 10)},
-		{"binary", humanSize(n.v, 1024)},
-		{"SI", humanSize(n.v, 1000)},
+		{"bytes", decimal(n.float())},
+		{"binary", humanSize(n.float(), 1024)},
+		{"SI", humanSize(n.float(), 1000)},
 	}}, nil
 }
 

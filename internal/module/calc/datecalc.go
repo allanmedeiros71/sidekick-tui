@@ -321,7 +321,7 @@ func convertSpan(exprText, unitText string) (r Result, ok bool, err error) {
 }
 
 // ageResult describes how old someone born on birth is today, in whole
-// calendar years and months, then weeks and days.
+// calendar years and months, then days.
 func ageResult(input string, now time.Time) (Result, error) {
 	b, rest, isDate, ok := dateTerm(strings.TrimSpace(input), now)
 	if !ok || !isDate || strings.TrimSpace(rest) != "" {
@@ -346,11 +346,8 @@ func ageResult(input string, now time.Time) (Result, error) {
 	if m := int64(months % 12); m > 0 {
 		parts = append(parts, plural(m, "month"))
 	}
-	if days >= 7 {
-		parts = append(parts, "("+plural(days/7, "week")+")")
-	}
-	if d := days % 7; d > 0 || len(parts) == 0 {
-		parts = append(parts, plural(d, "day"))
+	if days > 0 || len(parts) == 0 {
+		parts = append(parts, plural(days, "day"))
 	}
 
 	next := span{years: months/12 + 1}.applyTo(birth)

@@ -3,17 +3,36 @@ package calc
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"unicode"
 )
 
-// number is an integer value produced by the expression evaluator. sized
-// records whether any operand carried a size unit (KiB, MB...), which makes
-// the result worth showing as a human-readable size.
+// number is a value produced by the expression evaluator. It is an exact
+// rational, so 0.1 + 0.2 is 0.3 and 10/3 keeps every digit; only a
+// fractional power (2 ** 0.5) falls back to floating point. sized records
+// whether any operand carried a size unit (KiB, MB...), which makes the
+// result worth showing as a human-readable size.
 type number struct {
-	v     int64
+	r     *big.Rat
 	sized bool
+}
+
+func intNumber(v int64) number { return number{r: new(big.Rat).SetInt64(v)} }
+
+// int64 returns the value if it is a whole number that fits in 64 bits.
+func (n number) int64() (int64, bool) {
+	if !n.r.IsInt() || !n.r.Num().IsInt64() {
+		return 0, false
+	}
+	return n.r.Num().Int64(), true
+}
+
+// float returns the value as a float64, rounding as needed.
+func (n number) float() float64 {
+	f, _ := n.r.Float64()
+	return f
 }
 
 type tokenKind int
@@ -33,11 +52,12 @@ type token struct {
 	pos  int
 }
 
-// operators, longest first so "**" and "<<" win over "*" and "<".
-var operators = []string{"**", "<<", ">>", "+", "-", "*", "/", "%", "&", "|", "^", "~"}
+// operators, longest first so "**", "//" and "<<" win over "*", "/" and "<".
+var operators = []string{"**", "//", "<<", ">>", "+", "-", "*", "/", "%", "&", "|", "^", "~"}
 
-// evalExpr evaluates an integer expression with C-like operators, Python-like
-// precedence for ** and unary minus, and literals in decimal, 0x, 0b and 0o,
+// evalExpr evaluates an arithmetic expression with C-like operators,
+// Python-like precedence for ** and unary minus, and literals in decimal
+// (with an optional fraction and exponent, as in 6.022e23), 0x, 0b and 0o,
 // optionally followed by a size unit (4KiB, 1.5 GB).
 func evalExpr(s string) (number, error) {
 	toks, err := lex(s)
@@ -64,7 +84,7 @@ func tokenText(t token) string {
 	case tokRParen:
 		return ")"
 	case tokNum:
-		return fmt.Sprint(t.num.v)
+		return t.num.r.RatString()
 	}
 	return "end of input"
 }
@@ -108,8 +128,10 @@ func lex(s string) ([]token, error) {
 	return append(toks, token{kind: tokEOF, pos: len(s)}), nil
 }
 
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+
 // lexNumber reads a literal starting at s[i] and returns it with the index
-// just past it, including any trailing size unit.
+// just past it, including any exponent and trailing size unit.
 func lexNumber(s string, i int) (number, int, error) {
 	start := i
 	base, digits := 10, "0123456789_"
@@ -136,12 +158,28 @@ func lexNumber(s string, i int) (number, int, error) {
 			i++
 		}
 	}
-	body := strings.ReplaceAll(s[bodyStart:i], "_", "")
-	if body == "" || body == "." {
+	mantissa := strings.ReplaceAll(s[bodyStart:i], "_", "")
+	if mantissa == "" || mantissa == "." {
 		return number{}, 0, fmt.Errorf("malformed number at %d", start+1)
 	}
-	if base == 10 && len(body) > 1 && body[0] == '0' && body[1] != '.' {
-		return number{}, 0, fmt.Errorf("ambiguous leading zero in %q: write 0o%s for octal", s[start:i], body[1:])
+	if base == 10 && len(mantissa) > 1 && mantissa[0] == '0' && mantissa[1] != '.' {
+		return number{}, 0, fmt.Errorf("ambiguous leading zero in %q: write 0o%s for octal", s[start:i], mantissa[1:])
+	}
+
+	// Exponent: "e" or "E" followed by digits, optionally signed. A bare
+	// "E" is left for the EiB unit.
+	exponent := ""
+	if base == 10 && i < len(s) && (s[i] == 'e' || s[i] == 'E') {
+		j := i + 1
+		if j < len(s) && (s[j] == '+' || s[j] == '-') {
+			j++
+		}
+		if j < len(s) && isDigit(s[j]) {
+			for j < len(s) && isDigit(s[j]) {
+				j++
+			}
+			exponent, i = s[i:j], j
+		}
 	}
 
 	// Optional size unit, possibly after spaces: "4KiB", "1.5 GB".
@@ -167,11 +205,14 @@ func lexNumber(s string, i int) (number, int, error) {
 
 	r := new(big.Rat)
 	if base == 10 {
-		if _, ok := r.SetString(body); !ok {
-			return number{}, 0, fmt.Errorf("malformed number %q", body)
+		if len(exponent) > 6 {
+			return number{}, 0, errTooLarge
+		}
+		if _, ok := r.SetString(mantissa + exponent); !ok {
+			return number{}, 0, fmt.Errorf("malformed number %q", mantissa+exponent)
 		}
 	} else {
-		n, ok := new(big.Int).SetString(body, base)
+		n, ok := new(big.Int).SetString(mantissa, base)
 		if !ok {
 			return number{}, 0, fmt.Errorf("malformed number %q", s[start:i])
 		}
@@ -180,23 +221,23 @@ func lexNumber(s string, i int) (number, int, error) {
 		if n.BitLen() > 64 {
 			return number{}, 0, errOverflow
 		}
-		r.SetInt(n)
-		if !sized && n.BitLen() == 64 {
-			return number{v: int64(n.Uint64())}, i, nil
+		if n.BitLen() == 64 {
+			n.SetInt64(int64(n.Uint64()))
 		}
-	}
-	if !r.IsInt() && !sized {
-		return number{}, 0, fmt.Errorf("fractions need a size unit (e.g. 1.5GiB); the calculator works on integers")
+		r.SetInt(n)
 	}
 	r.Mul(r, new(big.Rat).SetInt64(unit))
-	v := new(big.Int).Quo(r.Num(), r.Denom()) // truncate fractional bytes
-	if !v.IsInt64() {
-		return number{}, 0, errOverflow
-	}
-	return number{v: v.Int64(), sized: sized}, i, nil
+	return number{r: r, sized: sized}, i, nil
 }
 
-var errOverflow = errors.New("overflow: result does not fit in 64 bits")
+var (
+	errOverflow = errors.New("overflow: does not fit in 64 bits")
+	errTooLarge = errors.New("number too large")
+)
+
+// maxBits bounds the size of exact results, so 9 ** 9 ** 9 fails quickly
+// instead of exhausting memory.
+const maxBits = 1 << 16
 
 type parser struct {
 	toks []token
@@ -207,7 +248,7 @@ func (p *parser) peek() token { return p.toks[p.i] }
 func (p *parser) next() token { t := p.toks[p.i]; p.i++; return t }
 
 var precedence = map[string]int{
-	"|": 1, "^": 2, "&": 3, "<<": 4, ">>": 4, "+": 5, "-": 5, "*": 6, "/": 6, "%": 6,
+	"|": 1, "^": 2, "&": 3, "<<": 4, ">>": 4, "+": 5, "-": 5, "*": 6, "/": 6, "//": 6, "%": 6,
 }
 
 // parseBinary implements precedence climbing for left-associative operators.
@@ -244,12 +285,13 @@ func (p *parser) parseUnary() (number, error) {
 		}
 		switch t.op {
 		case "-":
-			if n.v == minInt64 {
-				return number{}, errOverflow
-			}
-			n.v = -n.v
+			n.r = new(big.Rat).Neg(n.r)
 		case "~":
-			n.v = ^n.v
+			v, ok := n.int64()
+			if !ok {
+				return number{}, errors.New("~ needs a whole number that fits in 64 bits")
+			}
+			n.r = new(big.Rat).SetInt64(^v)
 		}
 		return n, nil
 	}
@@ -292,63 +334,112 @@ func (p *parser) parsePrimary() (number, error) {
 	return number{}, fmt.Errorf("unexpected %q at %d", tokenText(t), t.pos+1)
 }
 
-const minInt64 = -1 << 63
-
 func apply(op string, a, b number) (number, error) {
-	out := number{sized: a.sized || b.sized}
-	x, y := a.v, b.v
+	out := number{r: new(big.Rat), sized: a.sized || b.sized}
 	switch op {
-	case "&":
-		out.v = x & y
-	case "|":
-		out.v = x | y
-	case "^":
-		out.v = x ^ y
-	case "/", "%":
-		if y == 0 {
+	case "+":
+		out.r.Add(a.r, b.r)
+	case "-":
+		out.r.Sub(a.r, b.r)
+	case "*":
+		out.r.Mul(a.r, b.r)
+	case "/":
+		if b.r.Sign() == 0 {
 			return number{}, errors.New("division by zero")
 		}
-		if x == minInt64 && y == -1 {
-			return number{}, errOverflow
+		out.r.Quo(a.r, b.r)
+	case "**":
+		return power(a, b)
+	default: // integer-only operators, on 64-bit values
+		x, okx := a.int64()
+		y, oky := b.int64()
+		if !okx || !oky {
+			return number{}, fmt.Errorf("%s needs whole numbers that fit in 64 bits", op)
 		}
-		if op == "/" {
-			out.v = x / y
-		} else {
-			out.v = x % y
+		v, err := applyInt(op, x, y)
+		if err != nil {
+			return number{}, err
 		}
+		out.r.SetInt64(v)
+	}
+	if out.r.Num().BitLen() > maxBits || out.r.Denom().BitLen() > maxBits {
+		return number{}, errTooLarge
+	}
+	return out, nil
+}
+
+func applyInt(op string, x, y int64) (int64, error) {
+	switch op {
+	case "&":
+		return x & y, nil
+	case "|":
+		return x | y, nil
+	case "^":
+		return x ^ y, nil
+	case "//", "%":
+		if y == 0 {
+			return 0, errors.New("division by zero")
+		}
+		if x == math.MinInt64 && y == -1 {
+			return 0, errOverflow
+		}
+		if op == "//" {
+			return x / y, nil
+		}
+		return x % y, nil
 	case "<<", ">>":
 		if y < 0 || y > 63 {
-			return number{}, fmt.Errorf("shift count %d out of range 0..63", y)
+			return 0, fmt.Errorf("shift count %d out of range 0..63", y)
 		}
 		// Shifts act on the 64-bit pattern: 1 << 63 is 0x8000000000000000.
 		if op == "<<" {
-			out.v = x << uint(y)
-		} else {
-			out.v = x >> uint(y)
+			return x << uint(y), nil
 		}
-	default: // + - * **: computed exactly, then checked for overflow.
-		bx, by := big.NewInt(x), big.NewInt(y)
-		r := new(big.Int)
-		switch op {
-		case "+":
-			r.Add(bx, by)
-		case "-":
-			r.Sub(bx, by)
-		case "*":
-			r.Mul(bx, by)
-		case "**":
-			if y < 0 {
-				return number{}, errors.New("negative exponent")
-			}
-			if y > 64 && x != 0 && x != 1 && x != -1 {
-				return number{}, errOverflow
-			}
-			r.Exp(bx, by, nil)
-		}
-		if !r.IsInt64() {
-			return number{}, errOverflow
-		}
-		out.v = r.Int64()
+		return x >> uint(y), nil
 	}
+	return 0, fmt.Errorf("unknown operator %s", op)
+}
+
+// power is exact for whole exponents and approximate otherwise.
+func power(a, b number) (number, error) {
+	out := number{r: new(big.Rat), sized: a.sized || b.sized}
+	if e, ok := b.int64(); ok {
+		if a.r.Sign() == 0 && e < 0 {
+			return number{}, errors.New("division by zero")
+		}
+		num, den := new(big.Int).Abs(a.r.Num()), a.r.Denom()
+		if e != 0 && int64(max(num.BitLen(), den.BitLen())-1)*abs(e) > maxBits {
+			return number{}, errTooLarge
+		}
+		ue := big.NewInt(abs(e))
+		n, d := new(big.Int).Exp(num, ue, nil), new(big.Int).Exp(den, ue, nil)
+		if a.r.Sign() < 0 && e%2 != 0 {
+			n.Neg(n)
+		}
+		if e < 0 {
+			n, d = d, n
+			if d.Sign() < 0 {
+				n.Neg(n)
+				d.Neg(d)
+			}
+		}
+		out.r.SetFrac(n, d)
+		return out, nil
+	}
+	f := math.Pow(a.float(), b.float())
+	if math.IsNaN(f) {
+		return number{}, errors.New("a negative number has no real fractional power")
+	}
+	if math.IsInf(f, 0) {
+		return number{}, errTooLarge
+	}
+	out.r.SetFloat64(f)
 	return out, nil
+}
+
+func abs(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
