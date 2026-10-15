@@ -13,8 +13,8 @@ type Module interface {
 	Title() string
 }
 
-// Planned lists the modules on the roadmap, in menu order. They are not
-// implemented yet; the menu shows them as placeholders.
+// Planned lists the modules on the roadmap, in menu order. Entries that are
+// not implemented yet are shown in the menu as placeholders.
 var Planned = []struct{ ID, Title, Description string }{
 	{"calc", "Calculator", "hex/bin, bitwise, epoch, chmod, CIDR, sizes"},
 	{"inspect", "Inspector", "base64, URL, JWT, hashes, UUID, JSON"},

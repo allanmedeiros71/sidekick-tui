@@ -25,3 +25,40 @@ func TestCursorStaysInBounds(t *testing.T) {
 		t.Fatalf("cursor = %d, want 0", got)
 	}
 }
+
+func TestEnterOpensCalculatorAndEscReturns(t *testing.T) {
+	var m tea.Model = New(config.Default())
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.(Model).active == nil || m.(Model).active.ID() != "calc" {
+		t.Fatal("enter on the first entry should open the calculator")
+	}
+	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.(Model).active != nil {
+		t.Fatal("esc should return to the menu")
+	}
+	if cmd != nil {
+		t.Fatal("esc inside a module should not quit")
+	}
+}
+
+func TestQTypesInsideModule(t *testing.T) {
+	var m tea.Model = New(config.Default()).Open("calc")
+	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if cmd != nil {
+		if _, ok := cmd().(tea.QuitMsg); ok {
+			t.Fatal("q inside a module should be typed, not quit")
+		}
+	}
+	if m.(Model).active == nil {
+		t.Fatal("module should still be open")
+	}
+}
+
+func TestUnimplementedModuleShowsNotice(t *testing.T) {
+	var m tea.Model = New(config.Default())
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.(Model).active != nil || m.(Model).notice == "" {
+		t.Fatal("expected a coming-soon notice")
+	}
+}

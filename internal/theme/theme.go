@@ -10,6 +10,7 @@ type Theme struct {
 	Item     lipgloss.Style
 	Selected lipgloss.Style
 	Muted    lipgloss.Style
+	Error    lipgloss.Style
 }
 
 // Get returns the theme with the given name, falling back to the default.
@@ -29,6 +30,7 @@ func Default() Theme {
 		Item:     lipgloss.NewStyle(),
 		Selected: lipgloss.NewStyle().Bold(true).Foreground(accent),
 		Muted:    lipgloss.NewStyle().Faint(true),
+		Error:    lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C0392B", Dark: "#FF6B6B"}),
 	}
 }
 
@@ -45,5 +47,6 @@ func CGA() Theme {
 		Item:     base,
 		Selected: lipgloss.NewStyle().Background(cyan).Foreground(blue).Bold(true),
 		Muted:    base.Foreground(white),
+		Error:    base.Foreground(lipgloss.Color("#FF5555")).Bold(true),
 	}
 }
