@@ -282,8 +282,8 @@ func spanResult(sp span) Result {
 }
 
 // convertSpan handles "30d in w" and "90m to h". ok is false when the
-// input is not a duration converted to a time unit, so "1GiB in m" and
-// "30m in g" stay size conversions.
+// input is not a duration converted to a time unit, so "1GiB in M" and
+// "3072M in g" stay size conversions.
 func convertSpan(exprText, unitText string) (r Result, ok bool, err error) {
 	sp, isSpan := parseBareSpan(strings.TrimSpace(exprText))
 	if !isSpan {

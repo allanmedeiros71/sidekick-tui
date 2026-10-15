@@ -157,6 +157,9 @@ func lexNumber(s string, i int) (number, int, error) {
 	if k > j {
 		u, ok := lookupUnit(s[j:k])
 		if !ok {
+			if s[j:k] == "m" {
+				return number{}, 0, errors.New(`"m" is minutes: write M for MiB`)
+			}
 			return number{}, 0, fmt.Errorf("unknown unit %q", s[j:k])
 		}
 		unit, sized, i = u, true, k

@@ -78,8 +78,7 @@ func Eval(input string, now time.Time) (Result, error) {
 	}
 	n, err := evalExpr(s)
 	if err != nil {
-		// "30d" or "1h30m" is not an integer expression but is a duration;
-		// "30m" stays 30 MiB.
+		// "30d" or "1h30m" is not an integer expression but is a duration.
 		if sp, ok := parseBareSpan(s); ok {
 			return spanResult(sp), nil
 		}

@@ -35,7 +35,8 @@ like recent Unix timestamps (seconds or milliseconds) show the date.
 ## Sizes
 
 A number can carry a size unit, with or without a space: `4KiB`, `1.5 GB`,
-`512M * 3`. Units are case-insensitive:
+`512M * 3`. Units are case-insensitive, except that a bare `m` means
+minutes, so write `M` for MiB:
 
 - `B`
 - `KiB MiB GiB TiB PiB EiB`: powers of 1024
@@ -68,15 +69,14 @@ Add or subtract durations from a date (`now`, a date as above, or
 Duration units are `y` (years), `w` (weeks), `d` (days), `h`, `m` (minutes)
 and `s`, and can be combined: `1y2d`, `1h30m`. Years and days follow the
 calendar, so `2024-02-29 + 1y` is `2025-03-01` and a day across a DST change
-keeps the clock time. Outside a date expression `m` still means MiB.
+keeps the clock time.
 
 ### Durations
 
 A duration on its own, such as `30d` or `1h30m`, is shown in seconds,
 minutes, hours, days and weeks. Convert one with `in` or `to`: `30d in w`,
 `90m in h`, `1y to d`. Without a date there is no calendar to follow, so a
-year counts as 365 days. A bare `30m` is still 30 MiB; it means minutes only
-when converted to a time unit (`30m in h`).
+year counts as 365 days.
 
 ## chmod
 

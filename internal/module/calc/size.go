@@ -7,7 +7,8 @@ import (
 
 // units maps lower-case size suffixes to bytes. Bare letters (K, M, G...) are
 // binary, as in dd, ls -h and most dev tooling; "KB", "MB"... are SI (powers
-// of 1000) and "KiB", "MiB"... are explicitly binary.
+// of 1000) and "KiB", "MiB"... are explicitly binary. Suffixes are
+// case-insensitive except bare "m", which means minutes: write "M" for MiB.
 var units = map[string]int64{
 	"b": 1, "byte": 1, "bytes": 1,
 	"k": 1 << 10, "kib": 1 << 10, "kb": 1e3,
@@ -19,6 +20,9 @@ var units = map[string]int64{
 }
 
 func lookupUnit(s string) (int64, bool) {
+	if s == "m" {
+		return 0, false
+	}
 	u, ok := units[strings.ToLower(s)]
 	return u, ok
 }
@@ -93,4 +97,9 @@ func convertSize(exprText, unitText string) (Result, error) {
 
 type unknownUnitError struct{ unit string }
 
-func (e *unknownUnitError) Error() string { return "unknown unit " + strconv.Quote(e.unit) }
+func (e *unknownUnitError) Error() string {
+	if e.unit == "m" {
+		return `"m" is minutes: write M for MiB`
+	}
+	return "unknown unit " + strconv.Quote(e.unit)
+}

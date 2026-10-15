@@ -64,7 +64,7 @@ func TestDateArithmeticErrors(t *testing.T) {
 
 func TestDateArithmeticLeavesOtherInputsAlone(t *testing.T) {
 	tests := []struct{ in, kind string }{
-		{"1m + 2m", "expr"}, // sizes, not minutes: no date operand
+		{"1M + 2M", "expr"}, // MiB, not minutes
 		{"2026-01-01", "epoch"},
 		{"now", "epoch"},
 		{"@(1 + 2)", "epoch"},
@@ -91,11 +91,11 @@ func TestDurationConversion(t *testing.T) {
 			t.Errorf("Eval(%q) = %q, want %q", tt.in, got, tt.want)
 		}
 	}
-	if got := get(mustEval(t, "1GiB in m"), "result"); got != "1024 MiB" {
-		t.Errorf("1GiB in m = %q, want a size conversion", got)
+	if got := get(mustEval(t, "1GiB in M"), "result"); got != "1024 MiB" {
+		t.Errorf("1GiB in M = %q, want a size conversion", got)
 	}
-	if got := get(mustEval(t, "3072m in g"), "result"); got != "3 GiB" {
-		t.Errorf("3072m in g = %q, want a size conversion", got)
+	if got := get(mustEval(t, "3072M in g"), "result"); got != "3 GiB" {
+		t.Errorf("3072M in g = %q, want a size conversion", got)
 	}
 	if _, err := Eval("10d to x", refNow); err == nil || !strings.Contains(err.Error(), "unknown time unit") {
 		t.Errorf("10d to x error = %v", err)
@@ -116,7 +116,23 @@ func TestBareDuration(t *testing.T) {
 	if got := get(mustEval(t, "48h"), "duration"); got != "2 days" {
 		t.Errorf("48h = %s", got)
 	}
-	if r := mustEval(t, "30m"); r.Kind != "expr" {
-		t.Errorf("30m should stay 30 MiB, got %s", r.Kind)
+	if got := get(mustEval(t, "30m"), "duration"); got != "30 minutes" {
+		t.Errorf("30m = %s, want 30 minutes", got)
+	}
+	if got := get(mustEval(t, "30M"), "size"); got != "30 MiB" {
+		t.Errorf("30M size = %s, want 30 MiB", got)
+	}
+}
+
+func TestLowercaseMIsMinutes(t *testing.T) {
+	_, err := Eval("1m + 2m", refNow)
+	if err == nil || !strings.Contains(err.Error(), "write M for MiB") {
+		t.Errorf("1m + 2m error = %v", err)
+	}
+	if _, err := Eval("1GiB in m", refNow); err == nil {
+		t.Error("1GiB in m: expected an error, m is minutes")
+	}
+	if got := get(mustEval(t, "2MB + 1mb"), "dec"); got != "3000000" {
+		t.Errorf("2MB + 1mb = %s: multi-letter units stay case-insensitive", got)
 	}
 }
