@@ -33,8 +33,8 @@ func (r Result) Summary() string {
 
 // Eval interprets input, trying in order: "now", chmod modes, date
 // arithmetic ("now + 3d", "2026-12-25 - now"), "@timestamp",
-// CIDR blocks and IP addresses, dates, "<size> in <unit>" conversions and
-// finally integer expressions. now is the reference for relative times and
+// CIDR blocks and IP addresses, dates, "<duration|size> in <unit>"
+// conversions, integer expressions and finally bare durations ("30d"). now is the reference for relative times and
 // its location is used as the local time zone.
 func Eval(input string, now time.Time) (Result, error) {
 	s := strings.TrimSpace(input)
@@ -69,11 +69,20 @@ func Eval(input string, now time.Time) (Result, error) {
 	}
 	for _, kw := range []string{" in ", " to "} {
 		if i := strings.LastIndex(lower, kw); i >= 0 {
-			return convertSize(s[:i], strings.TrimSpace(s[i+len(kw):]))
+			unit := strings.TrimSpace(s[i+len(kw):])
+			if r, ok, err := convertSpan(s[:i], unit); ok {
+				return r, err
+			}
+			return convertSize(s[:i], unit)
 		}
 	}
 	n, err := evalExpr(s)
 	if err != nil {
+		// "30d" or "1h30m" is not an integer expression but is a duration;
+		// "30m" stays 30 MiB.
+		if sp, ok := parseBareSpan(s); ok {
+			return spanResult(sp), nil
+		}
 		return Result{}, err
 	}
 	return numberResult(n, now), nil

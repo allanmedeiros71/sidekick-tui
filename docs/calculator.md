@@ -63,12 +63,20 @@ Add or subtract durations from a date (`now`, a date as above, or
 | `now + 3d`             | the date three days from now                   |
 | `2026-01-01 - 2w`      | two weeks before New Year                      |
 | `@1700000000 + 1h30m`  | a timestamp plus 90 minutes                    |
-| `2026-12-25 - now`     | time left, e.g. `70 days 12 hours`, also in seconds, hours, days and weeks |
+| `2026-12-25 - now`     | time left, e.g. `70 days (10 weeks) 12 hours`, also in seconds, hours, days and weeks |
 
 Duration units are `y` (years), `w` (weeks), `d` (days), `h`, `m` (minutes)
 and `s`, and can be combined: `1y2d`, `1h30m`. Years and days follow the
 calendar, so `2024-02-29 + 1y` is `2025-03-01` and a day across a DST change
 keeps the clock time. Outside a date expression `m` still means MiB.
+
+### Durations
+
+A duration on its own, such as `30d` or `1h30m`, is shown in seconds,
+minutes, hours, days and weeks. Convert one with `in` or `to`: `30d in w`,
+`90m in h`, `1y to d`. Without a date there is no calendar to follow, so a
+year counts as 365 days. A bare `30m` is still 30 MiB; it means minutes only
+when converted to a time unit (`30m in h`).
 
 ## chmod
 

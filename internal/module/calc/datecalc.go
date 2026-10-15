@@ -187,7 +187,7 @@ func diffResult(from, to time.Time) Result {
 }
 
 // calendarDuration describes to - from in whole calendar years, then days,
-// hours, minutes and seconds, e.g. "1 year 3 days 4 hours".
+// hours, minutes and seconds, e.g. "1 year 10 days (1 week 3 days) 4 hours".
 func calendarDuration(from, to time.Time) string {
 	sign := ""
 	if to.Before(from) {
@@ -197,30 +197,108 @@ func calendarDuration(from, to time.Time) string {
 	for !from.AddDate(years+1, 0, 0).After(to) {
 		years++
 	}
-	rem := to.Sub(from.AddDate(years, 0, 0))
-	parts := []struct {
-		n    int64
-		name string
-	}{
-		{int64(years), "year"},
-		{int64(rem / (24 * time.Hour)), "day"},
-		{int64(rem % (24 * time.Hour) / time.Hour), "hour"},
-		{int64(rem % time.Hour / time.Minute), "minute"},
-		{int64(rem % time.Minute / time.Second), "second"},
-	}
+	return sign + describeDuration(int64(years), 0, to.Sub(from.AddDate(years, 0, 0)))
+}
+
+// describeDuration spells out years, days and an exact remainder, carrying
+// whole days out of rest. Day counts of a week or more are also given in
+// weeks, e.g. "168 days (24 weeks)".
+func describeDuration(years, days int64, rest time.Duration) string {
+	days += int64(rest / (24 * time.Hour))
+	rest %= 24 * time.Hour
 	var out []string
-	for _, p := range parts {
-		if p.n == 0 {
-			continue
+	add := func(n int64, name string) {
+		if n == 0 {
+			return
 		}
-		s := fmt.Sprintf("%d %s", p.n, p.name)
-		if p.n != 1 {
-			s += "s"
-		}
-		out = append(out, s)
+		out = append(out, plural(n, name))
 	}
+	add(years, "year")
+	add(days, "day")
+	if days >= 7 {
+		weeks := plural(days/7, "week")
+		if days%7 != 0 {
+			weeks += " " + plural(days%7, "day")
+		}
+		out = append(out, "("+weeks+")")
+	}
+	add(int64(rest/time.Hour), "hour")
+	add(int64(rest%time.Hour/time.Minute), "minute")
+	add(int64(rest%time.Minute/time.Second), "second")
 	if len(out) == 0 {
 		return "0 seconds"
 	}
-	return sign + strings.Join(out, " ")
+	return strings.Join(out, " ")
+}
+
+func plural(n int64, name string) string {
+	s := fmt.Sprintf("%d %s", n, name)
+	if n != 1 {
+		s += "s"
+	}
+	return s
+}
+
+// Durations outside a date have no calendar to follow, so a year counts as
+// 365 days.
+const yearSeconds = 365 * 24 * 60 * 60
+
+func (s span) seconds() float64 {
+	return float64(s.years)*yearSeconds + float64(s.days)*86400 + s.rest.Seconds()
+}
+
+var timeUnits = map[string]struct {
+	seconds float64
+	name    string
+}{
+	"s": {1, "seconds"},
+	"m": {60, "minutes"},
+	"h": {3600, "hours"},
+	"d": {86400, "days"},
+	"w": {7 * 86400, "weeks"},
+	"y": {yearSeconds, "years"},
+}
+
+// parseBareSpan reads a whole input such as "30d" or "1h30m" as a duration.
+func parseBareSpan(s string) (span, bool) {
+	if spanTermRe.FindString(s) != s {
+		return span{}, false
+	}
+	sp, err := parseSpan(s)
+	return sp, err == nil
+}
+
+// spanResult shows a duration in every time unit.
+func spanResult(sp span) Result {
+	secs := sp.seconds()
+	return Result{Kind: "duration", Lines: []Line{
+		{"duration", describeDuration(int64(sp.years), int64(sp.days), sp.rest)},
+		{"seconds", formatFloat(secs)},
+		{"minutes", formatFloat(secs / 60)},
+		{"hours", formatFloat(secs / 3600)},
+		{"days", formatFloat(secs / 86400)},
+		{"weeks", formatFloat(secs / (7 * 86400))},
+	}}
+}
+
+// convertSpan handles "30d in w" and "90m to h". ok is false when the
+// input is not a duration converted to a time unit, so "1GiB in m" and
+// "30m in g" stay size conversions.
+func convertSpan(exprText, unitText string) (r Result, ok bool, err error) {
+	sp, isSpan := parseBareSpan(strings.TrimSpace(exprText))
+	if !isSpan {
+		return Result{}, false, nil
+	}
+	u, isTime := timeUnits[unitText]
+	if !isTime {
+		if _, isSize := lookupUnit(unitText); isSize {
+			return Result{}, false, nil
+		}
+		return Result{}, true, fmt.Errorf("unknown time unit %q: use s, m, h, d, w or y", unitText)
+	}
+	v := strconv.FormatFloat(sp.seconds()/u.seconds, 'f', 4, 64)
+	v = strings.TrimSuffix(strings.TrimRight(v, "0"), ".")
+	r = spanResult(sp)
+	r.Lines = append([]Line{{"result", v + " " + u.name}}, r.Lines...)
+	return r, true, nil
 }
