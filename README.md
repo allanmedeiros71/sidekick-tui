@@ -52,17 +52,16 @@ On ARM, the file ends in `.aarch64.rpm`.
 
 ### Arch Linux and derivatives
 
-From the AUR, with any helper:
+Download the package from the release and install the local file:
 
 ```sh
-yay -S sidekick-bin
+curl -LO https://github.com/allanmedeiros71/sidekick-tui/releases/download/vVERSION/sidekick-VERSION-1-x86_64.pkg.tar.zst
+sudo pacman -U ./sidekick-VERSION-1-x86_64.pkg.tar.zst
 ```
 
-Or install the package from the release directly:
-
-```sh
-sudo pacman -U https://github.com/allanmedeiros71/sidekick-tui/releases/download/vVERSION/sidekick-VERSION-1-x86_64.pkg.tar.zst
-```
+The packages are not signed, so `pacman -U <url>` fails looking for a `.sig`
+file; installing the downloaded file avoids that. On ARM, the file ends in
+`-aarch64.pkg.tar.zst`. An AUR package (`sidekick-bin`) is planned.
 
 ### Prebuilt binary
 
