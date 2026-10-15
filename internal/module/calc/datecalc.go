@@ -9,22 +9,29 @@ import (
 	"time"
 )
 
-// span is a length of time to add to a date. Years and days are calendar
-// units (applied with AddDate, so a year from Feb 29 and a day across a DST
-// change behave as on a calendar); the rest is exact.
+// span is a length of time to add to a date. Years, months and days are
+// calendar units: adding months keeps the day of the month, clamped to the
+// month's last day (Jan 31 + 1mo is Feb 28), and a day across a DST change
+// keeps the clock time. The rest is exact.
 type span struct {
-	years, days int
-	rest        time.Duration
+	years, months, days int
+	rest                time.Duration
 }
 
-func (s span) neg() span { return span{-s.years, -s.days, -s.rest} }
+func (s span) neg() span { return span{-s.years, -s.months, -s.days, -s.rest} }
 
 func (s span) add(o span) span {
-	return span{s.years + o.years, s.days + o.days, s.rest + o.rest}
+	return span{s.years + o.years, s.months + o.months, s.days + o.days, s.rest + o.rest}
 }
 
 func (s span) applyTo(t time.Time) time.Time {
-	return t.AddDate(s.years, 0, s.days).Add(s.rest)
+	if months := s.years*12 + s.months; months != 0 {
+		y, m, d := t.Date()
+		first := time.Date(y, m+time.Month(months), 1, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+		last := first.AddDate(0, 1, -1).Day()
+		t = first.AddDate(0, 0, min(d, last)-1)
+	}
+	return t.AddDate(0, 0, s.days).Add(s.rest)
 }
 
 type dateValueKind int
@@ -44,11 +51,12 @@ type dateValue struct {
 }
 
 var (
-	dateTermRe = regexp.MustCompile(`^(?i)\d{4}-\d{2}-\d{2}([t ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(z|[+-]\d{2}:\d{2})?)?`)
-	nowTermRe  = regexp.MustCompile(`^(?i)now\b`)
-	epochRe    = regexp.MustCompile(`^@\d+`)
-	spanTermRe = regexp.MustCompile(`^(\d+[ywdhms])+\b`)
-	spanPartRe = regexp.MustCompile(`(\d+)([ywdhms])`)
+	dateTermRe  = regexp.MustCompile(`^(?i)\d{4}-\d{2}-\d{2}([t ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(z|[+-]\d{2}:\d{2})?)?`)
+	nowTermRe   = regexp.MustCompile(`^(?i)now\b`)
+	todayTermRe = regexp.MustCompile(`^(?i)today\b`)
+	epochRe     = regexp.MustCompile(`^@\d+`)
+	spanTermRe  = regexp.MustCompile(`^(\d+(mo|[ywdhms]))+\b`)
+	spanPartRe  = regexp.MustCompile(`(\d+)(mo|[ywdhms])`)
 )
 
 // evalDateExpr handles date arithmetic such as "now + 3d", "2026-01-01 - 2w"
@@ -107,6 +115,9 @@ func dateTerm(s string, now time.Time) (v dateValue, rest string, isDate, ok boo
 			return dateValue{kind: kindDate, t: t}, s[len(m):], true, true
 		}
 	}
+	if m := todayTermRe.FindString(s); m != "" {
+		return dateValue{kind: kindDate, t: today(now)}, s[len(m):], true, true
+	}
 	if m := nowTermRe.FindString(s); m != "" {
 		return dateValue{kind: kindDate, t: now}, s[len(m):], true, true
 	}
@@ -136,6 +147,8 @@ func parseSpan(s string) (span, error) {
 		switch m[2] {
 		case "y":
 			sp.years += n
+		case "mo":
+			sp.months += n
 		case "w":
 			sp.days += 7 * n
 		case "d":
@@ -197,13 +210,13 @@ func calendarDuration(from, to time.Time) string {
 	for !from.AddDate(years+1, 0, 0).After(to) {
 		years++
 	}
-	return sign + describeDuration(int64(years), 0, to.Sub(from.AddDate(years, 0, 0)))
+	return sign + describeDuration(int64(years), 0, 0, to.Sub(from.AddDate(years, 0, 0)))
 }
 
-// describeDuration spells out years, days and an exact remainder, carrying
+// describeDuration spells out years, months, days and an exact remainder, carrying
 // whole days out of rest. Day counts of a week or more are also given in
 // weeks, e.g. "168 days (24 weeks)".
-func describeDuration(years, days int64, rest time.Duration) string {
+func describeDuration(years, months, days int64, rest time.Duration) string {
 	days += int64(rest / (24 * time.Hour))
 	rest %= 24 * time.Hour
 	var out []string
@@ -214,6 +227,7 @@ func describeDuration(years, days int64, rest time.Duration) string {
 		out = append(out, plural(n, name))
 	}
 	add(years, "year")
+	add(months, "month")
 	add(days, "day")
 	if days >= 7 {
 		weeks := plural(days/7, "week")
@@ -240,23 +254,25 @@ func plural(n int64, name string) string {
 }
 
 // Durations outside a date have no calendar to follow, so a year counts as
-// 365 days.
+// 365 days and a month as a twelfth of that.
 const yearSeconds = 365 * 24 * 60 * 60
 
 func (s span) seconds() float64 {
-	return float64(s.years)*yearSeconds + float64(s.days)*86400 + s.rest.Seconds()
+	return float64(s.years)*yearSeconds + float64(s.months)*yearSeconds/12 +
+		float64(s.days)*86400 + s.rest.Seconds()
 }
 
 var timeUnits = map[string]struct {
 	seconds float64
 	name    string
 }{
-	"s": {1, "seconds"},
-	"m": {60, "minutes"},
-	"h": {3600, "hours"},
-	"d": {86400, "days"},
-	"w": {7 * 86400, "weeks"},
-	"y": {yearSeconds, "years"},
+	"s":  {1, "seconds"},
+	"m":  {60, "minutes"},
+	"h":  {3600, "hours"},
+	"d":  {86400, "days"},
+	"w":  {7 * 86400, "weeks"},
+	"mo": {yearSeconds / 12, "months"},
+	"y":  {yearSeconds, "years"},
 }
 
 // parseBareSpan reads a whole input such as "30d" or "1h30m" as a duration.
@@ -272,7 +288,7 @@ func parseBareSpan(s string) (span, bool) {
 func spanResult(sp span) Result {
 	secs := sp.seconds()
 	return Result{Kind: "duration", Lines: []Line{
-		{"duration", describeDuration(int64(sp.years), int64(sp.days), sp.rest)},
+		{"duration", describeDuration(int64(sp.years), int64(sp.months), int64(sp.days), sp.rest)},
 		{"seconds", formatFloat(secs)},
 		{"minutes", formatFloat(secs / 60)},
 		{"hours", formatFloat(secs / 3600)},
@@ -294,7 +310,7 @@ func convertSpan(exprText, unitText string) (r Result, ok bool, err error) {
 		if _, isSize := lookupUnit(unitText); isSize {
 			return Result{}, false, nil
 		}
-		return Result{}, true, fmt.Errorf("unknown time unit %q: use s, m, h, d, w or y", unitText)
+		return Result{}, true, fmt.Errorf("unknown time unit %q: use s, m, h, d, w, mo or y", unitText)
 	}
 	v := strconv.FormatFloat(sp.seconds()/u.seconds, 'f', 4, 64)
 	v = strings.TrimSuffix(strings.TrimRight(v, "0"), ".")

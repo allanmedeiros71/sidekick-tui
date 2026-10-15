@@ -51,32 +51,39 @@ Convert with `in` or `to`: `1.5GiB in MB`, `4096 to KiB`.
 | Input                       | Result                                      |
 | --------------------------- | ------------------------------------------- |
 | `now`                       | current Unix time                           |
+| `today`                     | the start of today (local midnight)         |
 | `@1700000000`               | timestamp to date; the unit (s, ms, µs, ns) is guessed from the magnitude |
 | `2024-05-01`, `2024-05-01 13:30`, RFC 3339 | date to timestamp; dates without a zone use the local zone |
 
 ### Date arithmetic
 
-Add or subtract durations from a date (`now`, a date as above, or
-`@timestamp`), or subtract two dates to get the time between them:
+Add or subtract durations from a date (`now`, `today`, a date as above, or
+`@timestamp`), or subtract two dates to get the time between them. Use
+`today` for whole days: it has no time of day, so `today + 3mo` lands on a
+date and `2026-12-25 - today` counts whole days. Results show the date with
+its weekday, and dates at midnight are described in calendar days
+(`tomorrow`, `in 3 days`).
 
 | Input                  | Result                                         |
 | ---------------------- | ---------------------------------------------- |
 | `now + 3d`             | the date three days from now                   |
+| `today + 3mo`          | the date three months from today               |
 | `2026-01-01 - 2w`      | two weeks before New Year                      |
 | `@1700000000 + 1h30m`  | a timestamp plus 90 minutes                    |
 | `2026-12-25 - now`     | time left, e.g. `70 days (10 weeks) 12 hours`, also in seconds, hours, days and weeks |
 
-Duration units are `y` (years), `w` (weeks), `d` (days), `h`, `m` (minutes)
-and `s`, and can be combined: `1y2d`, `1h30m`. Years and days follow the
-calendar, so `2024-02-29 + 1y` is `2025-03-01` and a day across a DST change
-keeps the clock time.
+Duration units are `y` (years), `mo` (months), `w` (weeks), `d` (days), `h`,
+`m` (minutes) and `s`, and can be combined: `1y2mo`, `1h30m`. Years, months
+and days follow the calendar: the day of the month is kept and clamped to the
+month's end, so `2026-01-31 + 1mo` is `2026-02-28` and `2024-02-29 + 1y` is
+`2025-02-28`, and a day across a DST change keeps the clock time.
 
 ### Durations
 
 A duration on its own, such as `30d` or `1h30m`, is shown in seconds,
 minutes, hours, days and weeks. Convert one with `in` or `to`: `30d in w`,
-`90m in h`, `1y to d`. Without a date there is no calendar to follow, so a
-year counts as 365 days.
+`90m in h`, `1y to d`, `6mo in w`. Without a date there is no calendar to
+follow, so a year counts as 365 days and a month as a twelfth of that.
 
 ## chmod
 

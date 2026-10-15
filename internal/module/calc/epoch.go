@@ -2,6 +2,7 @@ package calc
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 )
@@ -51,8 +52,15 @@ func timestampResult(n int64, now time.Time) Result {
 	return Result{Kind: "epoch", Lines: append(lines, timeLines(t, now)...)}
 }
 
+// today returns the start of now's day in its location.
+func today(now time.Time) time.Time {
+	y, m, d := now.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+}
+
 func dateResult(t time.Time, now time.Time) Result {
 	lines := []Line{
+		{"date", t.In(now.Location()).Format("2006-01-02 Monday")},
 		{"epoch", strconv.FormatInt(t.Unix(), 10)},
 		{"epoch ms", strconv.FormatInt(t.UnixMilli(), 10)},
 	}
@@ -67,8 +75,25 @@ func timeLines(t, now time.Time) []Line {
 	}
 }
 
-// relative describes t from now's point of view, e.g. "3 days ago".
+// relative describes t from now's point of view, e.g. "3 days ago". A t at
+// local midnight, such as a plain date or "today + 3d", is described in
+// calendar days: "tomorrow", "in 3 days".
 func relative(t, now time.Time) string {
+	if lt := t.In(now.Location()); lt.Equal(today(lt)) {
+		days := int(math.Round(lt.Sub(today(now)).Hours() / 24))
+		switch {
+		case days == 0:
+			return "today"
+		case days == 1:
+			return "tomorrow"
+		case days == -1:
+			return "yesterday"
+		case days > 1 && days < 365:
+			return fmt.Sprintf("in %d days", days)
+		case days < -1 && days > -365:
+			return fmt.Sprintf("%d days ago", -days)
+		}
+	}
 	d := t.Sub(now)
 	future := d > 0
 	if !future {

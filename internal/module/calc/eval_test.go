@@ -151,7 +151,7 @@ func TestEpoch(t *testing.T) {
 	}
 
 	r = mustEval(t, "2026-10-16")
-	if get(r, "epoch") != "1792108800" || get(r, "relative") != "in 12 hours" {
+	if get(r, "epoch") != "1792108800" || get(r, "relative") != "tomorrow" {
 		t.Errorf("2026-10-16 = %+v", r.Lines)
 	}
 	if got := get(mustEval(t, "2024-01-02T03:04:05-03:00"), "UTC"); got != "2024-01-02T06:04:05Z" {
