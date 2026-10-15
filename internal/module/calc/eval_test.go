@@ -45,7 +45,12 @@ func TestExpressions(t *testing.T) {
 		{"2 ** 3 ** 2", "512"},
 		{"2 ** 62", "4611686018427387904"},
 		{"1 << 63", "-9223372036854775808"},
-		{"-7 / 2", "-3"},
+		{"-7 // 2", "-3"},
+		{"7 // 2 * 2", "6"},
+		{"6 / 3", "2"},
+		{"1e3", "1000"},
+		{"1.5e3", "1500"},
+		{"2.5 * 4", "10"},
 		{"-7 % 3", "-1"},
 		{"256 >> 4", "16"},
 		{"0xFFFFFFFFFFFFFFFF", "-1"},
@@ -99,10 +104,15 @@ func TestNumberFormats(t *testing.T) {
 func TestExpressionErrors(t *testing.T) {
 	tests := []struct{ in, msg string }{
 		{"1 / 0", "division by zero"},
-		{"2 ** 64", "overflow"},
-		{"9223372036854775807 + 1", "overflow"},
+		{"0x1FFFFFFFFFFFFFFFF", "overflow"},
+		{"9 ** 9 ** 9", "too large"},
+		{"1.5 & 1", "whole numbers"},
+		{"1.5 // 1", "whole numbers"},
+		{"~0.5", "whole number"},
+		{"(-8) ** 0.5", "no real fractional power"},
+		{"0 ** -1", "division by zero"},
+		{"@(3/2)", "whole number"},
 		{"1 << 64", "out of range"},
-		{"1.5", "fractions need a size unit"},
 		{"0755", "0o755"},
 		{"(1 + 2", "missing )"},
 		{"1 +", "incomplete"},
@@ -241,5 +251,50 @@ func TestEmptyInput(t *testing.T) {
 	r, err := Eval("   ", refNow)
 	if err != nil || len(r.Lines) != 0 {
 		t.Errorf("empty input = %+v, %v", r, err)
+	}
+}
+
+func TestDecimals(t *testing.T) {
+	tests := []struct{ in, dec, fraction, sci string }{
+		{"10 / 3", "3.33333333333333", "10/3", "3.33333333333333e+00"},
+		{"0.1 + 0.2", "0.3", "3/10", "3e-01"},
+		{"-7 / 2", "-3.5", "-7/2", "-3.5e+00"},
+		{"1.5", "1.5", "3/2", "1.5e+00"},
+		{"6.022e23 / 1e20", "6022", "", ""},
+		{"1.6e-19 * 2", "0.00000000000000000032", "", "3.2e-19"},
+		{"2 ** -2", "0.25", "1/4", "2.5e-01"},
+		{"(2/3) ** 2", "0.444444444444444", "4/9", "4.44444444444444e-01"},
+		{"2 ** 0.5", "1.4142135623731", "", "1.4142135623731e+00"},
+	}
+	for _, tt := range tests {
+		r := mustEval(t, tt.in)
+		dec := get(r, "dec")
+		if tt.in == "1.6e-19 * 2" {
+			dec = tt.dec // shown in scientific notation, checked below
+			if get(r, "dec") != "3.2e-19" {
+				t.Errorf("Eval(%q) dec = %s, want 3.2e-19", tt.in, get(r, "dec"))
+			}
+		}
+		if dec != tt.dec || get(r, "fraction") != tt.fraction || (tt.sci != "" && get(r, "sci") != tt.sci) {
+			t.Errorf("Eval(%q) = dec %q fraction %q sci %q, want %q %q %q",
+				tt.in, get(r, "dec"), get(r, "fraction"), get(r, "sci"), tt.dec, tt.fraction, tt.sci)
+		}
+	}
+
+	r := mustEval(t, "2 ** 64")
+	if get(r, "dec") != "18446744073709551616" || get(r, "sci") != "1.84467440737096e+19" || get(r, "hex") != "" {
+		t.Errorf("2 ** 64 = %+v", r.Lines)
+	}
+	if got := get(mustEval(t, "6.022e23"), "sci"); got != "6.022e+23" {
+		t.Errorf("6.022e23 sci = %s", got)
+	}
+	if got := get(mustEval(t, "2 ** 1000"), "dec"); got != "" {
+		t.Errorf("2 ** 1000 should only show sci, dec = %s", got)
+	}
+	if got := get(mustEval(t, "1.1KiB"), "size"); got != "1.1 KiB" {
+		t.Errorf("1.1KiB size = %s", got)
+	}
+	if got := get(mustEval(t, "2E"), "size"); got != "2 EiB" {
+		t.Errorf("2E (EiB) size = %s", got)
 	}
 }

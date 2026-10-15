@@ -11,21 +11,29 @@ sidekick calc '0xff + 1'
 sidekick calc 10.0.0.0/22
 ```
 
-## Integer expressions
+## Expressions
 
-64-bit signed integers, shown in decimal, hex, octal and binary.
+Arithmetic is exact: `0.1 + 0.2` is `0.3` and `10 / 3` keeps every digit.
+Whole numbers that fit in 64 bits are shown in decimal, hex, octal and
+binary; other results are shown as a decimal, as a fraction when it is
+short (`10/3`), and in scientific notation (`3.33333333333333e+00`).
 
 | Input              | Notes                                                    |
 | ------------------ | -------------------------------------------------------- |
-| `255`, `1_000_000` | decimal; a leading zero is rejected, use `0o` for octal  |
+| `255`, `1_000_000`, `2.5` | decimal; a leading zero is rejected, use `0o` for octal |
+| `6.022e23`, `1.6e-19` | scientific notation                                   |
 | `0xFF`, `0b1010`, `0o755` | hex, binary, octal                                |
-| `+ - * / % **`     | `/` and `%` truncate toward zero; `**` is power          |
-| `& \| ^ ~ << >>`   | bitwise; shifts work on the 64-bit pattern               |
+| `+ - * /`          | exact; `/` gives a fraction (`7 / 2` is `3.5`)           |
+| `//`, `%`          | whole-number division and remainder, truncating toward zero like C |
+| `**`               | power; exact for whole exponents, approximate otherwise (`2 ** 0.5`) |
+| `& \| ^ ~ << >>`   | bitwise, on 64-bit whole numbers; shifts work on the bit pattern |
 | `( )`              | grouping                                                 |
 
-Precedence, lowest first: `|`, `^`, `&`, `<< >>`, `+ -`, `* / %`, unary
+Precedence, lowest first: `|`, `^`, `&`, `<< >>`, `+ -`, `* / // %`, unary
 `- + ~`, `**`. As in Python, `-2**2` is `-4` and `**` is right-associative.
-Overflow is reported instead of wrapping, except for shifts.
+Decimals show up to 15 significant digits. Very large or very small values
+are shown in scientific notation, and whole numbers of 13 digits or more
+show it too.
 
 Hex, binary and octal literals of up to 64 bits are bit patterns, so
 `0xFFFFFFFFFFFFFFFF` is `-1`. Negative results also show their unsigned value.
@@ -41,7 +49,8 @@ minutes, so write `M` for MiB:
 - `B`
 - `KiB MiB GiB TiB PiB EiB`: powers of 1024
 - `KB MB GB TB PB EB`: powers of 1000
-- `K M G T P E`: powers of 1024, as in `dd` and `ls -h`
+- `K M G T P E`: powers of 1024, as in `dd` and `ls -h` (`2E` is 2 EiB,
+  while `2e3` is 2000)
 
 Results that involve a unit are also shown as a human-readable size.
 Convert with `in` or `to`: `1.5GiB in MB`, `4096 to KiB`.

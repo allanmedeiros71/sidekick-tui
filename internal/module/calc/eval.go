@@ -1,10 +1,12 @@
-// Package calc is the developer calculator module: integer expressions in any
-// base with bitwise operators, Unix timestamps, chmod modes, CIDR blocks and
-// byte sizes. Eval is a pure function; Model wraps it in a Bubble Tea UI.
+// Package calc is the developer calculator module: exact arithmetic in any
+// base with bitwise operators, dates and durations, chmod modes, CIDR blocks
+// and byte sizes. Eval is a pure function; Model wraps it in a Bubble Tea UI.
 package calc
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -34,7 +36,7 @@ func (r Result) Summary() string {
 // Eval interprets input, trying in order: date arithmetic ("now + 3d",
 // "2026-12-25 - now"), "now", "today", "age <date>", chmod modes,
 // "@timestamp", CIDR blocks and IP addresses, dates, "<duration|size> in
-// <unit>" conversions, integer expressions and finally bare durations
+// <unit>" conversions, arithmetic expressions and finally bare durations
 // ("30d"). now is the reference for relative times and its location is used
 // as the local time zone.
 func Eval(input string, now time.Time) (Result, error) {
@@ -61,7 +63,11 @@ func Eval(input string, now time.Time) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
-		return timestampResult(n.v, now), nil
+		v, ok := n.int64()
+		if !ok {
+			return Result{}, errors.New("a timestamp must be a whole number")
+		}
+		return timestampResult(v, now), nil
 	}
 	if p, err := netip.ParsePrefix(s); err == nil {
 		return cidrResult(p), nil
@@ -83,7 +89,7 @@ func Eval(input string, now time.Time) (Result, error) {
 	}
 	n, err := evalExpr(s)
 	if err != nil {
-		// "30d" or "1h30m" is not an integer expression but is a duration.
+		// "30d" or "1h30m" is not an expression but is a duration.
 		if sp, ok := parseBareSpan(s); ok {
 			return spanResult(sp), nil
 		}
@@ -93,7 +99,10 @@ func Eval(input string, now time.Time) (Result, error) {
 }
 
 func numberResult(n number, now time.Time) Result {
-	v := n.v
+	v, ok := n.int64()
+	if !ok {
+		return Result{Kind: "expr", Lines: append(realLines(n), sizeLines(n)...)}
+	}
 	lines := []Line{
 		{"dec", strconv.FormatInt(v, 10)},
 		{"hex", "0x" + strings.ToUpper(strconv.FormatUint(uint64(v), 16))},
@@ -103,11 +112,10 @@ func numberResult(n number, now time.Time) Result {
 	if v < 0 {
 		lines = append(lines, Line{"unsigned", strconv.FormatUint(uint64(v), 10)})
 	}
-	if n.sized {
-		lines = append(lines,
-			Line{"size", humanSize(v, 1024)},
-			Line{"size SI", humanSize(v, 1000)})
+	if v <= -1e12 || v >= 1e12 {
+		lines = append(lines, Line{"sci", sci(n.float())})
 	}
+	lines = append(lines, sizeLines(n)...)
 	if v >= 32 && v < 127 {
 		lines = append(lines, Line{"char", fmt.Sprintf("%q", rune(v))})
 	}
@@ -117,6 +125,53 @@ func numberResult(n number, now time.Time) Result {
 		lines = append(lines, Line{"as epoch", fmt.Sprintf("%s (%s, %s)", t.UTC().Format(time.RFC3339), unit, relative(t, now))})
 	}
 	return Result{Kind: "expr", Lines: lines}
+}
+
+// realLines shows a value that is not a 64-bit integer: a fraction, or a
+// whole number too large for 64 bits.
+func realLines(n number) []Line {
+	f := n.float()
+	if n.r.IsInt() {
+		var lines []Line
+		if s := n.r.Num().String(); len(s) <= 40 {
+			lines = append(lines, Line{"dec", s})
+		}
+		return append(lines, Line{"sci", sci(f)})
+	}
+	lines := []Line{{"dec", decimal(f)}}
+	if n.r.Denom().BitLen() <= 32 && n.r.Num().BitLen() <= 64 {
+		lines = append(lines, Line{"fraction", n.r.String()})
+	}
+	return append(lines, Line{"sci", sci(f)})
+}
+
+func sizeLines(n number) []Line {
+	if !n.sized {
+		return nil
+	}
+	return []Line{{"size", humanSize(n.float(), 1024)}, {"size SI", humanSize(n.float(), 1000)}}
+}
+
+// decimal prints f with up to 15 significant digits, in plain notation when
+// that stays readable and in scientific notation otherwise.
+func decimal(f float64) string {
+	f = round15(f)
+	if a := math.Abs(f); a != 0 && (a < 1e-6 || a >= 1e21) {
+		return sci(f)
+	}
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// sci prints f in scientific notation, e.g. 6.022e+23.
+func sci(f float64) string {
+	return strconv.FormatFloat(round15(f), 'e', -1, 64)
+}
+
+// round15 drops the noise past 15 significant digits, so 1/3 prints as
+// 0.333333333333333 rather than 0.3333333333333333.
+func round15(f float64) float64 {
+	r, _ := strconv.ParseFloat(strconv.FormatFloat(f, 'g', 15, 64), 64)
+	return r
 }
 
 // groupBinary prints x in binary, in groups of 4 bits.
