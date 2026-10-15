@@ -21,8 +21,17 @@ const appName = "sidekick"
 
 // Config is the user configuration read from config.toml.
 type Config struct {
-	Theme string     `toml:"theme"`
-	Sync  SyncConfig `toml:"sync"`
+	Theme     string          `toml:"theme"`
+	Animation AnimationConfig `toml:"animation"`
+	Sync      SyncConfig      `toml:"sync"`
+}
+
+// AnimationConfig controls how the popup opens.
+type AnimationConfig struct {
+	// Slide is the side the frame slides in from: "left", "right" or "none".
+	Slide string `toml:"slide"`
+	// DurationMS is how long the slide takes, in milliseconds.
+	DurationMS int `toml:"duration_ms"`
 }
 
 // SyncConfig selects how the data directory is synchronized between machines.
@@ -34,8 +43,9 @@ type SyncConfig struct {
 // Default returns the configuration used when no file exists.
 func Default() Config {
 	return Config{
-		Theme: "default",
-		Sync:  SyncConfig{Backend: "none"},
+		Theme:     "default",
+		Animation: AnimationConfig{Slide: "right", DurationMS: 180},
+		Sync:      SyncConfig{Backend: "none"},
 	}
 }
 
