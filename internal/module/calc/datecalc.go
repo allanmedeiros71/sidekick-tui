@@ -3,6 +3,7 @@ package calc
 import (
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -317,4 +318,48 @@ func convertSpan(exprText, unitText string) (r Result, ok bool, err error) {
 	r = spanResult(sp)
 	r.Lines = append([]Line{{"result", v + " " + u.name}}, r.Lines...)
 	return r, true, nil
+}
+
+// ageResult describes how old someone born on birth is today, in whole
+// calendar years and months, then weeks and days.
+func ageResult(input string, now time.Time) (Result, error) {
+	b, rest, isDate, ok := dateTerm(strings.TrimSpace(input), now)
+	if !ok || !isDate || strings.TrimSpace(rest) != "" {
+		return Result{}, fmt.Errorf("age needs a date, e.g. age 1990-05-17")
+	}
+	birth, to := today(b.t.In(now.Location())), today(now)
+	if birth.After(to) {
+		return Result{}, errors.New("that date is in the future")
+	}
+
+	months := 0
+	for !(span{months: months + 1}).applyTo(birth).After(to) {
+		months++
+	}
+	anniversary := span{months: months}.applyTo(birth)
+	days := int64(math.Round(to.Sub(anniversary).Hours() / 24))
+
+	var parts []string
+	if y := int64(months / 12); y > 0 {
+		parts = append(parts, plural(y, "year"))
+	}
+	if m := int64(months % 12); m > 0 {
+		parts = append(parts, plural(m, "month"))
+	}
+	if days >= 7 {
+		parts = append(parts, "("+plural(days/7, "week")+")")
+	}
+	if d := days % 7; d > 0 || len(parts) == 0 {
+		parts = append(parts, plural(d, "day"))
+	}
+
+	next := span{years: months/12 + 1}.applyTo(birth)
+	lived := int64(math.Round(to.Sub(birth).Hours() / 24))
+	return Result{Kind: "age", Lines: []Line{
+		{"age", strings.Join(parts, " ")},
+		{"born", birth.Format("2006-01-02 Monday")},
+		{"next birthday", fmt.Sprintf("%s (%s)", next.Format("2006-01-02 Monday"), relative(next, now))},
+		{"days", strconv.FormatInt(lived, 10)},
+		{"weeks", formatFloat(float64(lived) / 7)},
+	}}, nil
 }

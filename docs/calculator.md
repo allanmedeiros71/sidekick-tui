@@ -52,6 +52,7 @@ Convert with `in` or `to`: `1.5GiB in MB`, `4096 to KiB`.
 | --------------------------- | ------------------------------------------- |
 | `now`                       | current Unix time                           |
 | `today`                     | the start of today (local midnight)         |
+| `age 1971-04-30`            | age today, e.g. `55 years 5 months (2 weeks) 1 day`, with the next birthday and days lived |
 | `@1700000000`               | timestamp to date; the unit (s, ms, µs, ns) is guessed from the magnitude |
 | `2024-05-01`, `2024-05-01 13:30`, RFC 3339 | date to timestamp; dates without a zone use the local zone |
 
