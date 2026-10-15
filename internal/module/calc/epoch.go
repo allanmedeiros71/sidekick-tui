@@ -80,7 +80,10 @@ func timeLines(t, now time.Time) []Line {
 // calendar days: "tomorrow", "in 3 days".
 func relative(t, now time.Time) string {
 	if lt := t.In(now.Location()); lt.Equal(today(lt)) {
-		days := int(math.Round(lt.Sub(today(now)).Hours() / 24))
+		// Compare whole days with whole days, so a date a year from today
+		// is "in 1 year" whatever the time of day.
+		now = today(now)
+		days := int(math.Round(lt.Sub(now).Hours() / 24))
 		switch {
 		case days == 0:
 			return "today"

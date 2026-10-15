@@ -31,11 +31,12 @@ func (r Result) Summary() string {
 	return r.Lines[0].Value
 }
 
-// Eval interprets input, trying in order: "now", "today", chmod modes, date
-// arithmetic ("now + 3d", "2026-12-25 - now"), "@timestamp",
-// CIDR blocks and IP addresses, dates, "<duration|size> in <unit>"
-// conversions, integer expressions and finally bare durations ("30d"). now is the reference for relative times and
-// its location is used as the local time zone.
+// Eval interprets input, trying in order: date arithmetic ("now + 3d",
+// "2026-12-25 - now"), "now", "today", "age <date>", chmod modes,
+// "@timestamp", CIDR blocks and IP addresses, dates, "<duration|size> in
+// <unit>" conversions, integer expressions and finally bare durations
+// ("30d"). now is the reference for relative times and its location is used
+// as the local time zone.
 func Eval(input string, now time.Time) (Result, error) {
 	s := strings.TrimSpace(input)
 	lower := strings.ToLower(s)
@@ -49,6 +50,8 @@ func Eval(input string, now time.Time) (Result, error) {
 		return dateResult(now, now), nil
 	case lower == "today":
 		return dateResult(today(now), now), nil
+	case strings.HasPrefix(lower, "age "):
+		return ageResult(s[len("age "):], now)
 	case strings.HasPrefix(lower, "chmod "):
 		return chmodResult(strings.TrimSpace(s[len("chmod "):]))
 	case symbolicMode.MatchString(s):
