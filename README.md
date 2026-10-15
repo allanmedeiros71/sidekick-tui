@@ -4,13 +4,13 @@ A pop-up toolbox for developers, in the spirit of Borland SideKick (the 1984
 MS-DOS TSR). Hit a shortcut, a panel appears on top of your work, you do the
 quick thing, and it disappears without taking you out of context.
 
-> **Status:** early skeleton. The popup opens and lists the planned modules;
-> none of them is implemented yet.
+> **Status:** early development. The [calculator](docs/calculator.md) and the
+> [inspector](docs/inspector.md) work; the other modules are planned.
 
 ## Planned modules
 
-1. **Calculator**: hex/bin, bitwise, epoch, chmod, CIDR, sizes
-2. **Inspector**: base64, URL, JWT, hashes, UUID, JSON
+1. **Calculator**: hex/bin, bitwise, epoch, chmod, CIDR, sizes ([docs](docs/calculator.md))
+2. **Inspector**: base64, URL, JWT, hashes, UUID, JSON ([docs](docs/inspector.md))
 3. **Scratchpad**: per-project notes (detects the current git repo)
 4. **Connections**: SSH, PostgreSQL, URLs; "dial" to connect
 5. **Runbooks**: commands with placeholders (podman, psql, ...)
@@ -82,6 +82,14 @@ Inside tmux, bind it to a popup:
 bind-key k display-popup -E -w 80% -h 80% sidekick
 ```
 
+Open a module directly with `sidekick calc` or `sidekick inspect`. Both also
+work without the UI, taking the input as arguments or from a pipe:
+
+```sh
+sidekick calc '0xff + 1'
+echo "$TOKEN" | sidekick inspect
+```
+
 Outside tmux, bind a global shortcut in your desktop environment that opens a
 terminal running `sidekick` (e.g. `ghostty -e sidekick`).
 
@@ -138,7 +146,7 @@ Layout:
 cmd/sidekick/      entry point
 internal/app/      root Bubble Tea model (popup frame and menu)
 internal/config/   TOML config and XDG directories
-internal/module/   module contract and roadmap
+internal/module/   module contract and roadmap, one package per module
 internal/theme/    Lip Gloss themes (default, CGA)
 ```
 

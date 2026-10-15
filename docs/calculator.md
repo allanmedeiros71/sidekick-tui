@@ -4,11 +4,13 @@ Open it from the menu, or directly with `sidekick calc`. The result updates as
 you type; `enter` keeps it in the history, `↑`/`↓` recall earlier inputs and
 `esc` goes back to the menu.
 
-For scripts and quick checks, pass the input on the command line:
+For scripts and quick checks, pass the input on the command line or pipe it
+in:
 
 ```sh
 sidekick calc '0xff + 1'
 sidekick calc 10.0.0.0/22
+echo '2**32' | sidekick calc
 ```
 
 ## Expressions
