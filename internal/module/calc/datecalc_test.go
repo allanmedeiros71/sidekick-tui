@@ -188,19 +188,22 @@ func TestMonths(t *testing.T) {
 
 func TestAge(t *testing.T) {
 	tests := []struct{ in, age, next string }{
-		{"age 1971-04-30", "55 years 5 months (2 weeks) 1 day", "2027-04-30 Friday (in 197 days)"},
+		{"age 1971-04-30", "55 years 5 months 15 days", "2027-04-30 Friday (in 197 days)"},
 		{"age 2025-10-15", "1 year", "2027-10-15 Friday (in 1 year)"},
-		{"age 2026-09-08", "1 month (1 week)", "2027-09-08 Wednesday (in 328 days)"},
+		{"age 2026-09-08", "1 month 7 days", "2027-09-08 Wednesday (in 328 days)"},
 		{"age 2026-10-14", "1 day", "2027-10-14 Thursday (in 364 days)"},
 		{"age 2026-10-15", "0 days", "2027-10-15 Friday (in 1 year)"},
-		{"age 2024-02-29", "2 years 7 months (2 weeks) 2 days", "2027-02-28 Sunday (in 136 days)"},
-		{"age 2000-10-16", "25 years 11 months (4 weeks) 1 day", "2026-10-16 Friday (tomorrow)"},
+		{"age 2024-02-29", "2 years 7 months 16 days", "2027-02-28 Sunday (in 136 days)"},
+		{"age 2000-10-16", "25 years 11 months 29 days", "2026-10-16 Friday (tomorrow)"},
 	}
 	for _, tt := range tests {
 		r := mustEval(t, tt.in)
 		if get(r, "age") != tt.age || get(r, "next birthday") != tt.next {
 			t.Errorf("Eval(%q) = %q / %q, want %q / %q", tt.in, get(r, "age"), get(r, "next birthday"), tt.age, tt.next)
 		}
+	}
+	if got := get(mustEval(t, "age 1945-11-25"), "age"); got != "80 years 10 months 20 days" {
+		t.Errorf("age 1945-11-25 = %s", got)
 	}
 	if got := get(mustEval(t, "age 1971-04-30"), "days"); got != "20257" {
 		t.Errorf("days lived = %s", got)
