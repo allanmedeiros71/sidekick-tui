@@ -38,7 +38,7 @@ type Model struct {
 func New(t theme.Theme) *Model {
 	in := textinput.New()
 	in.Prompt = "> "
-	in.Placeholder = "0xff + 1, 1.5GiB in MB, now + 3d, chmod 755, 10.0.0.0/24"
+	in.Placeholder = "0xff + 1, 1.5GiB in MB, today + 3mo, chmod 755, 10.0.0.0/24"
 	in.PromptStyle = t.Selected
 	in.TextStyle = t.Item
 	in.PlaceholderStyle = t.Muted

@@ -11,7 +11,8 @@ func TestDateArithmetic(t *testing.T) {
 		{"now+1y2d", "2027-10-17T12:00:00Z"},
 		{"now - 1h30m", "2026-10-15T10:30:00Z"},
 		{"2026-01-01 - 2w", "2025-12-18T00:00:00Z"},
-		{"2024-02-29 + 1y", "2025-03-01T00:00:00Z"},
+		{"2024-02-29 + 1y", "2025-02-28T00:00:00Z"},
+		{"2024-02-29 + 4y", "2028-02-29T00:00:00Z"},
 		{"@1700000000 + 1h", "2023-11-14T23:13:20Z"},
 		{"1d + now", "2026-10-16T12:00:00Z"},
 		{"2026-01-01 13:30 + 45s", "2026-01-01T13:30:45Z"},
@@ -134,5 +135,53 @@ func TestLowercaseMIsMinutes(t *testing.T) {
 	}
 	if got := get(mustEval(t, "2MB + 1mb"), "dec"); got != "3000000" {
 		t.Errorf("2MB + 1mb = %s: multi-letter units stay case-insensitive", got)
+	}
+}
+
+func TestToday(t *testing.T) {
+	r := mustEval(t, "today")
+	if get(r, "date") != "2026-10-15 Thursday" || get(r, "UTC") != "2026-10-15T00:00:00Z" || get(r, "relative") != "today" {
+		t.Errorf("today = %+v", r.Lines)
+	}
+	tests := []struct{ in, date, rel string }{
+		{"today + 1d", "2026-10-16 Friday", "tomorrow"},
+		{"today - 1d", "2026-10-14 Wednesday", "yesterday"},
+		{"today + 2w", "2026-10-29 Thursday", "in 14 days"},
+		{"today + 3mo", "2027-01-15 Friday", "in 92 days"},
+		{"today - 1y", "2025-10-15 Wednesday", "1 year ago"},
+		{"today + 1y2mo3d", "2027-12-18 Saturday", "in 1 year"},
+	}
+	for _, tt := range tests {
+		r := mustEval(t, tt.in)
+		if get(r, "date") != tt.date || get(r, "relative") != tt.rel {
+			t.Errorf("Eval(%q) = %s / %s, want %s / %s", tt.in, get(r, "date"), get(r, "relative"), tt.date, tt.rel)
+		}
+	}
+	r = mustEval(t, "2026-12-25 - today")
+	if get(r, "duration") != "71 days (10 weeks 1 day)" {
+		t.Errorf("2026-12-25 - today = %s", get(r, "duration"))
+	}
+}
+
+func TestMonths(t *testing.T) {
+	for in, want := range map[string]string{
+		"2026-01-31 + 1mo":  "2026-02-28 Saturday",
+		"2024-01-31 + 1mo":  "2024-02-29 Thursday",
+		"2026-03-31 - 1mo":  "2026-02-28 Saturday",
+		"2026-01-15 + 13mo": "2027-02-15 Monday",
+		"2026-05-31 - 7mo":  "2025-10-31 Friday",
+	} {
+		if got := get(mustEval(t, in), "date"); got != want {
+			t.Errorf("%s = %s, want %s", in, got, want)
+		}
+	}
+	if got := get(mustEval(t, "12mo in y"), "result"); got != "1 years" {
+		t.Errorf("12mo in y = %s", got)
+	}
+	if got := get(mustEval(t, "3mo"), "duration"); got != "3 months" {
+		t.Errorf("3mo = %s", got)
+	}
+	if got := get(mustEval(t, "1mo in d"), "result"); got != "30.4167 days" {
+		t.Errorf("1mo in d = %s", got)
 	}
 }
