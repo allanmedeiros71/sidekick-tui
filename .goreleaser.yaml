@@ -102,7 +102,10 @@ aurs:
 checksum:
   name_template: checksums.txt
 
+# Release notes come from the annotated tag message (git tag -a vX.Y.Z),
+# so they can be written by hand instead of listing every commit.
+release:
+  header: "{{ .TagBody }}"
+
 changelog:
-  sort: asc
-  filters:
-    exclude: ["^docs:", "^test:", "^chore:"]
+  disable: true
