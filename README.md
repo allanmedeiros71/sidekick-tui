@@ -22,14 +22,57 @@ stdin/stdout, written in any language.
 
 ## Install
 
-From source (Go 1.24+):
+Release builds are published on the
+[Releases page](https://github.com/allanmedeiros71/sidekick-tui/releases) for
+Linux and macOS (amd64 and arm64). The binary is static, so packages have no
+dependencies. In the commands below, replace `VERSION` with the release you
+want (without the leading `v`) and `amd64` with `arm64` on ARM machines.
+
+### macOS and Linux (Homebrew)
+
+```sh
+brew install --cask allanmedeiros71/tap/sidekick
+```
+
+### Debian, Ubuntu and derivatives
+
+```sh
+curl -LO https://github.com/allanmedeiros71/sidekick-tui/releases/download/vVERSION/sidekick_VERSION_amd64.deb
+sudo apt install ./sidekick_VERSION_amd64.deb
+```
+
+### Fedora, RHEL and derivatives
+
+```sh
+sudo dnf install https://github.com/allanmedeiros71/sidekick-tui/releases/download/vVERSION/sidekick-VERSION-1.x86_64.rpm
+```
+
+On ARM, the file ends in `.aarch64.rpm`.
+
+### Arch Linux and derivatives
+
+From the AUR, with any helper:
+
+```sh
+yay -S sidekick-bin
+```
+
+Or install the package from the release directly:
+
+```sh
+sudo pacman -U https://github.com/allanmedeiros71/sidekick-tui/releases/download/vVERSION/sidekick-VERSION-1-x86_64.pkg.tar.zst
+```
+
+### Prebuilt binary
+
+Download `sidekick_VERSION_<os>_<arch>.tar.gz`, extract it and put `sidekick`
+somewhere on your `PATH`.
+
+### From source (Go 1.24+)
 
 ```sh
 go install github.com/allanmedeiros71/sidekick-tui/cmd/sidekick@latest
 ```
-
-Prebuilt binaries for Linux and macOS (amd64, arm64) will be published on the
-Releases page.
 
 ## Usage
 
@@ -74,8 +117,20 @@ references such as `infisical://...` or `bw://...`, resolved at use time.
 go build ./cmd/sidekick
 go vet ./...
 go test ./...
-goreleaser release --snapshot --clean   # local cross-build
+goreleaser release --snapshot --clean   # local cross-build and packages
 ```
+
+### Releasing
+
+Push a `vX.Y.Z` tag. The release workflow builds the archives, the `.deb`,
+`.rpm` and Arch packages, and attaches them to a GitHub release. Two optional
+repository secrets turn on the extra channels; without them those steps are
+skipped and the release still succeeds:
+
+| Secret                      | Publishes                                        |
+| --------------------------- | ------------------------------------------------ |
+| `HOMEBREW_TAP_GITHUB_TOKEN` | `Casks/sidekick.rb` to `allanmedeiros71/homebrew-tap` |
+| `AUR_KEY`                   | the `sidekick-bin` package to the AUR            |
 
 Layout:
 

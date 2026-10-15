@@ -23,6 +23,82 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files: [LICENSE, README.md]
 
+# Native Linux packages: .deb (Debian, Ubuntu, Mint, Pop!_OS...),
+# .rpm (Fedora, RHEL, Rocky, Alma, openSUSE...) and .pkg.tar.zst (Arch, Manjaro,
+# EndeavourOS...). The binary is static, so there are no runtime dependencies.
+nfpms:
+  - id: packages
+    package_name: sidekick
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: Allan Medeiros
+    maintainer: Allan Medeiros <medeiros.allan@gmail.com>
+    homepage: https://github.com/allanmedeiros71/sidekick-tui
+    description: |-
+      Pop-up toolbox for developers, in the spirit of Borland SideKick.
+      Calculator, text inspector, scratchpad and more in a terminal popup.
+    license: MIT
+    section: utils
+    formats: [deb, rpm, archlinux]
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/sidekick/LICENSE
+      - src: README.md
+        dst: /usr/share/doc/sidekick/README.md
+    rpm:
+      group: Development/Tools
+    archlinux:
+      packager: Allan Medeiros <medeiros.allan@gmail.com>
+
+# Homebrew tap (macOS and Linux). Publishes Casks/sidekick.rb to
+# github.com/allanmedeiros71/homebrew-tap. Skipped while the
+# HOMEBREW_TAP_GITHUB_TOKEN secret is not set.
+homebrew_casks:
+  - name: sidekick
+    repository:
+      owner: allanmedeiros71
+      name: homebrew-tap
+      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "" }}'
+    directory: Casks
+    homepage: https://github.com/allanmedeiros71/sidekick-tui
+    description: Pop-up toolbox for developers, in the spirit of Borland SideKick
+    license: MIT
+    commit_author:
+      name: Allan Medeiros
+      email: medeiros.allan@gmail.com
+    commit_msg_template: "sidekick {{ .Tag }}"
+    skip_upload: '{{ if isEnvSet "HOMEBREW_TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+    hooks:
+      post:
+        # The binary is not notarized; drop the quarantine flag so
+        # Gatekeeper does not block it on first run.
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sidekick"]
+          end
+
+# Arch User Repository: publishes the sidekick-bin package, built from the
+# release tarballs. Skipped while the AUR_KEY secret is not set.
+aurs:
+  - name: sidekick-bin
+    homepage: https://github.com/allanmedeiros71/sidekick-tui
+    description: Pop-up toolbox for developers, in the spirit of Borland SideKick
+    maintainers:
+      - Allan Medeiros <medeiros dot allan at gmail dot com>
+    license: MIT
+    provides: [sidekick]
+    conflicts: [sidekick]
+    private_key: '{{ envOrDefault "AUR_KEY" "" }}'
+    git_url: ssh://aur@aur.archlinux.org/sidekick-bin.git
+    commit_author:
+      name: Allan Medeiros
+      email: medeiros.allan@gmail.com
+    skip_upload: '{{ if isEnvSet "AUR_KEY" }}false{{ else }}true{{ end }}'
+    package: |-
+      install -Dm755 "./sidekick" "${pkgdir}/usr/bin/sidekick"
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/sidekick/LICENSE"
+      install -Dm644 "./README.md" "${pkgdir}/usr/share/doc/sidekick/README.md"
+
 checksum:
   name_template: checksums.txt
 
