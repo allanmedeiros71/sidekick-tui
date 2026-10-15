@@ -58,7 +58,7 @@ homebrew_casks:
     repository:
       owner: allanmedeiros71
       name: homebrew-tap
-      token: '{{ index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}'
+      token: '{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}'
     directory: Casks
     homepage: https://github.com/allanmedeiros71/sidekick-tui
     description: Pop-up toolbox for developers, in the spirit of Borland SideKick
@@ -88,7 +88,7 @@ aurs:
     license: MIT
     provides: [sidekick]
     conflicts: [sidekick]
-    private_key: '{{ index .Env "AUR_KEY" }}'
+    private_key: '{{ .Env.AUR_KEY }}'
     git_url: ssh://aur@aur.archlinux.org/sidekick-bin.git
     commit_author:
       name: Allan Medeiros
