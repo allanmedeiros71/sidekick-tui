@@ -10,6 +10,7 @@ import (
 
 	"github.com/allanmedeiros71/sidekick-tui/internal/config"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module"
+	"github.com/allanmedeiros71/sidekick-tui/internal/module/cal"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/calc"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/inspect"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/notes"
@@ -21,6 +22,7 @@ import (
 var registry = map[string]func(theme.Theme) module.Module{
 	"calc":    func(t theme.Theme) module.Module { return calc.New(t) },
 	"inspect": func(t theme.Theme) module.Module { return inspect.New(t) },
+	"cal":     func(t theme.Theme) module.Module { return cal.New(t) },
 	"notes":   func(t theme.Theme) module.Module { return notes.New(t) },
 }
 
@@ -99,7 +101,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = m.close()
 			return m, tea.Quit
 		}
-		if m.active != nil && msg.Type == tea.KeyEsc {
+		if m.active != nil && msg.Type == tea.KeyEsc && !handlesEsc(m.active) {
 			// A module that fails to save stays open, showing the error.
 			if m.close() == nil {
 				m.active = nil
@@ -116,6 +118,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateMenu(msg)
 	}
 	return m, nil
+}
+
+// handlesEsc reports whether the module wants esc for itself right now.
+func handlesEsc(mod module.Module) bool {
+	h, ok := mod.(module.EscHandler)
+	return ok && h.HandlesEsc()
 }
 
 // close lets the active module save its state before it is left.

@@ -11,6 +11,8 @@ type Theme struct {
 	Selected lipgloss.Style
 	Muted    lipgloss.Style
 	Error    lipgloss.Style
+	// Cursor marks the selected cell in a grid, such as the calendar's day.
+	Cursor lipgloss.Style
 }
 
 // Get returns the theme with the given name, falling back to the default.
@@ -31,6 +33,7 @@ func Default() Theme {
 		Selected: lipgloss.NewStyle().Bold(true).Foreground(accent),
 		Muted:    lipgloss.NewStyle().Faint(true),
 		Error:    lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C0392B", Dark: "#FF6B6B"}),
+		Cursor:   lipgloss.NewStyle().Bold(true).Foreground(accent).Reverse(true),
 	}
 }
 
@@ -48,5 +51,6 @@ func CGA() Theme {
 		Selected: lipgloss.NewStyle().Background(cyan).Foreground(blue).Bold(true),
 		Muted:    base.Foreground(white),
 		Error:    base.Foreground(lipgloss.Color("#FF5555")).Bold(true),
+		Cursor:   lipgloss.NewStyle().Background(cyan).Foreground(blue).Bold(true),
 	}
 }

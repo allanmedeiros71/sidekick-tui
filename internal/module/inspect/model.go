@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/allanmedeiros71/sidekick-tui/internal/clipboard"
 	"github.com/allanmedeiros71/sidekick-tui/internal/theme"
 )
 
@@ -54,7 +55,7 @@ func New(t theme.Theme) *Model {
 	in.CharLimit = 1 << 16
 	in.Width = 56
 	in.Focus()
-	return &Model{theme: t, input: in, now: time.Now, copy: copyToClipboard}
+	return &Model{theme: t, input: in, now: time.Now, copy: clipboard.Write}
 }
 
 // ID implements module.Module.

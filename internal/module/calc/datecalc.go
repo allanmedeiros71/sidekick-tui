@@ -109,6 +109,41 @@ func evalDateExpr(s string, now time.Time) (r Result, ok bool, err error) {
 	return Result{}, true, errors.New("a date expression must result in a date or a difference")
 }
 
+// ParseDate evaluates s as a single date ("2026-12-25", "today", "now",
+// "@1700000000") or as date arithmetic that results in a date
+// ("today + 90d"), so other modules can jump to a date.
+func ParseDate(s string, now time.Time) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	acc, rest, _, ok := dateTerm(s, now)
+	if !ok {
+		return time.Time{}, fmt.Errorf("%q is not a date", s)
+	}
+	for {
+		rest = strings.TrimLeft(rest, " ")
+		if rest == "" {
+			break
+		}
+		op := rest[0]
+		if op != '+' && op != '-' {
+			return time.Time{}, fmt.Errorf("unexpected %q in date expression", rest)
+		}
+		rest = strings.TrimLeft(rest[1:], " ")
+		next, after, _, ok := dateTerm(rest, now)
+		if !ok {
+			return time.Time{}, fmt.Errorf("expected a date or a duration such as 3d or 1y, got %q", rest)
+		}
+		var err error
+		if acc, err = combine(acc, op, next); err != nil {
+			return time.Time{}, err
+		}
+		rest = after
+	}
+	if acc.kind != kindDate {
+		return time.Time{}, errors.New("the expression must result in a date")
+	}
+	return acc.t, nil
+}
+
 // dateTerm reads one operand from the start of s.
 func dateTerm(s string, now time.Time) (v dateValue, rest string, isDate, ok bool) {
 	if m := dateTermRe.FindString(s); m != "" {

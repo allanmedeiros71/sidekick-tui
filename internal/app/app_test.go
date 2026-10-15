@@ -58,7 +58,7 @@ func TestQTypesInsideModule(t *testing.T) {
 
 func TestUnimplementedModuleShowsNotice(t *testing.T) {
 	var m tea.Model = New(config.Default())
-	for range 3 {
+	for range 4 { // the first unimplemented entry
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -115,5 +115,20 @@ func TestLeavingModuleClosesIt(t *testing.T) {
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if c.closed != 3 || cmd == nil {
 		t.Fatal("ctrl+c should close the module and quit")
+	}
+}
+
+// escModule wants esc for itself, like the calendar's go-to prompt.
+type escModule struct{ closer }
+
+func (e *escModule) HandlesEsc() bool { return true }
+
+func TestModuleCanKeepEsc(t *testing.T) {
+	e := &escModule{}
+	m := New(config.Default())
+	m.active = e
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if next.(Model).active == nil || e.closed != 0 {
+		t.Fatal("esc should go to a module that handles it")
 	}
 }

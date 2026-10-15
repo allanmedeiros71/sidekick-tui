@@ -13,6 +13,7 @@ import (
 
 	"github.com/allanmedeiros71/sidekick-tui/internal/app"
 	"github.com/allanmedeiros71/sidekick-tui/internal/config"
+	"github.com/allanmedeiros71/sidekick-tui/internal/module/cal"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/calc"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/inspect"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/notes"
@@ -35,7 +36,8 @@ func main() {
 With no module, sidekick opens the menu. With a module name (e.g. calc) it
 opens that module directly. "sidekick calc <input>" and "sidekick inspect
 <input>" print the result and exit; "sidekick notes <text>" appends the text
-to the current project's scratchpad. All three also read from a pipe.
+to the current project's scratchpad and "sidekick cal <date>" prints the month
+holding that date. All of them also read from a pipe.
 
 flags:
 `)
@@ -84,6 +86,7 @@ var printers = map[string]func(string) int{
 	"calc":    printCalc,
 	"inspect": printInspect,
 	"notes":   appendNote,
+	"cal":     printCal,
 }
 
 // cliInput returns the input given on the command line or, when there is
@@ -144,6 +147,17 @@ func printCalc(input string) int {
 	for _, l := range r.Lines {
 		fmt.Printf("%-*s  %s\n", width, l.Label, l.Value)
 	}
+	return 0
+}
+
+// printCal prints the month holding the date given, e.g. "today + 90d".
+func printCal(input string) int {
+	out, err := cal.Print(input, time.Now())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sidekick: %v\n", err)
+		return 1
+	}
+	fmt.Println(out)
 	return 0
 }
 

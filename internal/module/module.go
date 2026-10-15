@@ -19,12 +19,20 @@ type Closer interface {
 	Close() error
 }
 
+// EscHandler is implemented by modules that use esc themselves at times,
+// such as to cancel a prompt. While HandlesEsc reports true, the app passes
+// esc to the module instead of leaving it.
+type EscHandler interface {
+	HandlesEsc() bool
+}
+
 // Planned lists the modules on the roadmap, in menu order. Entries that are
 // not implemented yet are shown in the menu as placeholders.
 var Planned = []struct{ ID, Title, Description string }{
 	{"calc", "Calculator", "hex/bin, bitwise, epoch, chmod, CIDR, sizes"},
 	{"inspect", "Inspector", "base64, URL, JWT, hashes, UUID, JSON"},
 	{"notes", "Scratchpad", "per-project notes, detects the current git repo"},
+	{"cal", "Calendar", "month view, ISO weeks, jump to dates like today + 90d"},
 	{"dial", "Connections", "SSH, PostgreSQL, URLs: dial to connect"},
 	{"runbooks", "Runbooks", "commands with placeholders"},
 	{"clip", "Clipboard", "history and snippets"},
