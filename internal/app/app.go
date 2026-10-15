@@ -36,11 +36,12 @@ type Model struct {
 	height int
 	active module.Module // nil while the menu is shown
 	notice string
+	slide  slide
 }
 
 // New builds the root model from the loaded configuration.
 func New(cfg config.Config) Model {
-	return Model{theme: theme.Get(cfg.Theme)}
+	return Model{theme: theme.Get(cfg.Theme), slide: newSlide(cfg.Animation)}
 }
 
 // Open returns m with the module id already open, as when sidekick is
@@ -70,15 +71,25 @@ func (m Model) open(build func(theme.Theme) module.Module) Model {
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
-	if m.active != nil {
-		return m.active.Init()
+	var cmds []tea.Cmd
+	if m.slide.running() {
+		cmds = append(cmds, slideTick())
 	}
-	return nil
+	if m.active != nil {
+		cmds = append(cmds, m.active.Init())
+	}
+	return tea.Batch(cmds...)
 }
 
 // Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case slideTickMsg:
+		m.slide.frame++
+		if m.slide.running() {
+			return m, slideTick()
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
@@ -137,7 +148,13 @@ func (m Model) View() string {
 	}
 	box := m.theme.Frame.Render(content)
 	if m.width == 0 || m.height == 0 {
+		if m.slide.running() {
+			return "" // wait for the window size so the frame can slide in
+		}
 		return box
+	}
+	if m.slide.running() {
+		return m.slide.place(box, m.width, m.height)
 	}
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }

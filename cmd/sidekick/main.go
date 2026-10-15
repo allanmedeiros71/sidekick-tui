@@ -26,6 +26,7 @@ var (
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
+	noAnimation := flag.Bool("no-animation", false, "open without the slide-in animation")
 	configPath := flag.String("config", "", "path to config file (default: ~/.config/sidekick/config.toml)")
 	flag.Usage = func() {
 		fmt.Fprint(flag.CommandLine.Output(), `usage: sidekick [flags] [module] [input...]
@@ -49,6 +50,9 @@ flags:
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sidekick: %v\n", err)
 		os.Exit(1)
+	}
+	if *noAnimation {
+		cfg.Animation.Slide = "none"
 	}
 
 	root := app.New(cfg)
