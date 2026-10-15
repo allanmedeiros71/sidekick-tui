@@ -4,14 +4,15 @@ A pop-up toolbox for developers, in the spirit of Borland SideKick (the 1984
 MS-DOS TSR). Hit a shortcut, a panel appears on top of your work, you do the
 quick thing, and it disappears without taking you out of context.
 
-> **Status:** early development. The [calculator](docs/calculator.md) and the
-> [inspector](docs/inspector.md) work; the other modules are planned.
+> **Status:** early development. The [calculator](docs/calculator.md), the
+> [inspector](docs/inspector.md) and the [scratchpad](docs/notes.md) work;
+> the other modules are planned.
 
 ## Planned modules
 
 1. **Calculator**: hex/bin, bitwise, epoch, chmod, CIDR, sizes ([docs](docs/calculator.md))
 2. **Inspector**: base64, URL, JWT, hashes, UUID, JSON ([docs](docs/inspector.md))
-3. **Scratchpad**: per-project notes (detects the current git repo)
+3. **Scratchpad**: per-project notes (detects the current git repo) ([docs](docs/notes.md))
 4. **Connections**: SSH, PostgreSQL, URLs; "dial" to connect
 5. **Runbooks**: commands with placeholders (podman, psql, ...)
 6. **Clipboard**: history and snippets
@@ -93,13 +94,19 @@ bind-key k display-popup -E -B -x R -y 0 -w 60% -h 100% sidekick
 
 Use `sidekick -no-animation` or the `[animation]` setting below to turn it off.
 
-Open a module directly with `sidekick calc` or `sidekick inspect`. Both also
-work without the UI, taking the input as arguments or from a pipe:
+Open a module directly with `sidekick calc`, `sidekick inspect` or
+`sidekick notes`. They also work without the UI, taking the input as
+arguments or from a pipe:
 
 ```sh
 sidekick calc '0xff + 1'
 echo "$TOKEN" | sidekick inspect
+sidekick notes 'remember to bump the chart version'   # appends to the project's note
 ```
+
+The scratchpad picks the note from the current directory's git repository,
+so pass the pane's directory to the popup:
+`display-popup -E -d '#{pane_current_path}' sidekick`.
 
 Outside tmux, bind a global shortcut in your desktop environment that opens a
 terminal running `sidekick` (e.g. `ghostty -e sidekick`).

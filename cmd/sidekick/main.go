@@ -15,6 +15,7 @@ import (
 	"github.com/allanmedeiros71/sidekick-tui/internal/config"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/calc"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/inspect"
+	"github.com/allanmedeiros71/sidekick-tui/internal/module/notes"
 )
 
 // Set by GoReleaser via -ldflags.
@@ -33,7 +34,8 @@ func main() {
 
 With no module, sidekick opens the menu. With a module name (e.g. calc) it
 opens that module directly. "sidekick calc <input>" and "sidekick inspect
-<input>" print the result and exit; they also read the input from a pipe.
+<input>" print the result and exit; "sidekick notes <text>" appends the text
+to the current project's scratchpad. All three also read from a pipe.
 
 flags:
 `)
@@ -81,6 +83,7 @@ flags:
 var printers = map[string]func(string) int{
 	"calc":    printCalc,
 	"inspect": printInspect,
+	"notes":   appendNote,
 }
 
 // cliInput returns the input given on the command line or, when there is
@@ -140,6 +143,27 @@ func printCalc(input string) int {
 	}
 	for _, l := range r.Lines {
 		fmt.Printf("%-*s  %s\n", width, l.Label, l.Value)
+	}
+	return 0
+}
+
+// appendNote adds input to the scratchpad of the git repository in the
+// current directory, or to the global one outside a repository.
+func appendNote(input string) int {
+	data, err := config.DataDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sidekick: %v\n", err)
+		return 1
+	}
+	path := notes.GlobalPath(data)
+	if dir, err := os.Getwd(); err == nil {
+		if p, ok := notes.Detect(dir); ok {
+			path = notes.ProjectPath(data, p)
+		}
+	}
+	if err := notes.Append(path, input); err != nil {
+		fmt.Fprintf(os.Stderr, "sidekick: %v\n", err)
+		return 1
 	}
 	return 0
 }

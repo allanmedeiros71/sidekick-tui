@@ -12,6 +12,7 @@ import (
 	"github.com/allanmedeiros71/sidekick-tui/internal/module"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/calc"
 	"github.com/allanmedeiros71/sidekick-tui/internal/module/inspect"
+	"github.com/allanmedeiros71/sidekick-tui/internal/module/notes"
 	"github.com/allanmedeiros71/sidekick-tui/internal/theme"
 )
 
@@ -20,6 +21,7 @@ import (
 var registry = map[string]func(theme.Theme) module.Module{
 	"calc":    func(t theme.Theme) module.Module { return calc.New(t) },
 	"inspect": func(t theme.Theme) module.Module { return inspect.New(t) },
+	"notes":   func(t theme.Theme) module.Module { return notes.New(t) },
 }
 
 // Implemented reports whether the module with the given ID can be opened.
@@ -94,10 +96,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
+			_ = m.close()
 			return m, tea.Quit
 		}
 		if m.active != nil && msg.Type == tea.KeyEsc {
-			m.active = nil
+			// A module that fails to save stays open, showing the error.
+			if m.close() == nil {
+				m.active = nil
+			}
 			return m, nil
 		}
 	}
@@ -110,6 +116,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateMenu(msg)
 	}
 	return m, nil
+}
+
+// close lets the active module save its state before it is left.
+func (m Model) close() error {
+	if c, ok := m.active.(module.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }
 
 func (m Model) updateMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

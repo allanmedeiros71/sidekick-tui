@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -57,8 +58,9 @@ func TestQTypesInsideModule(t *testing.T) {
 
 func TestUnimplementedModuleShowsNotice(t *testing.T) {
 	var m tea.Model = New(config.Default())
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	for range 3 {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.(Model).active != nil || m.(Model).notice == "" {
 		t.Fatal("expected a coming-soon notice")
@@ -80,5 +82,38 @@ func TestOpenedModuleLearnsWindowSize(t *testing.T) {
 	// The inspector's output is taller than 15 rows unless it knows the size.
 	if n := strings.Count(m.(Model).active.View(), "\n") + 1; n > 15-4 {
 		t.Fatalf("inspector view has %d rows in a 15-row window", n)
+	}
+}
+
+// closer is a module that records being closed and can fail to.
+type closer struct {
+	closed int
+	err    error
+}
+
+func (c *closer) Init() tea.Cmd                       { return nil }
+func (c *closer) Update(tea.Msg) (tea.Model, tea.Cmd) { return c, nil }
+func (c *closer) View() string                        { return "" }
+func (c *closer) ID() string                          { return "closer" }
+func (c *closer) Title() string                       { return "Closer" }
+func (c *closer) Close() error                        { c.closed++; return c.err }
+
+func TestLeavingModuleClosesIt(t *testing.T) {
+	c := &closer{err: errors.New("disk full")}
+	m := New(config.Default())
+	m.active = c
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if c.closed != 1 || next.(Model).active == nil {
+		t.Fatal("a module that fails to close should stay open")
+	}
+	c.err = nil
+	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if c.closed != 2 || next.(Model).active != nil {
+		t.Fatal("esc should close the module and return to the menu")
+	}
+	m.active = c
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if c.closed != 3 || cmd == nil {
+		t.Fatal("ctrl+c should close the module and quit")
 	}
 }
