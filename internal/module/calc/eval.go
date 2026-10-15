@@ -31,13 +31,17 @@ func (r Result) Summary() string {
 	return r.Lines[0].Value
 }
 
-// Eval interprets input, trying in order: "now", chmod modes, "@timestamp",
+// Eval interprets input, trying in order: "now", chmod modes, date
+// arithmetic ("now + 3d", "2026-12-25 - now"), "@timestamp",
 // CIDR blocks and IP addresses, dates, "<size> in <unit>" conversions and
 // finally integer expressions. now is the reference for relative times and
 // its location is used as the local time zone.
 func Eval(input string, now time.Time) (Result, error) {
 	s := strings.TrimSpace(input)
 	lower := strings.ToLower(s)
+	if r, ok, err := evalDateExpr(s, now); ok {
+		return r, err
+	}
 	switch {
 	case s == "":
 		return Result{}, nil

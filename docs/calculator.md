@@ -53,6 +53,23 @@ Convert with `in` or `to`: `1.5GiB in MB`, `4096 to KiB`.
 | `@1700000000`               | timestamp to date; the unit (s, ms, µs, ns) is guessed from the magnitude |
 | `2024-05-01`, `2024-05-01 13:30`, RFC 3339 | date to timestamp; dates without a zone use the local zone |
 
+### Date arithmetic
+
+Add or subtract durations from a date (`now`, a date as above, or
+`@timestamp`), or subtract two dates to get the time between them:
+
+| Input                  | Result                                         |
+| ---------------------- | ---------------------------------------------- |
+| `now + 3d`             | the date three days from now                   |
+| `2026-01-01 - 2w`      | two weeks before New Year                      |
+| `@1700000000 + 1h30m`  | a timestamp plus 90 minutes                    |
+| `2026-12-25 - now`     | time left, e.g. `70 days 12 hours`, also in seconds, hours, days and weeks |
+
+Duration units are `y` (years), `w` (weeks), `d` (days), `h`, `m` (minutes)
+and `s`, and can be combined: `1y2d`, `1h30m`. Years and days follow the
+calendar, so `2024-02-29 + 1y` is `2025-03-01` and a day across a DST change
+keeps the clock time. Outside a date expression `m` still means MiB.
+
 ## chmod
 
 `chmod 755`, `chmod 4755`, `rwxr-xr-x` or `-rw-r--r--` (as printed by
